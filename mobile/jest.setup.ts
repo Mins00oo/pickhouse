@@ -24,6 +24,9 @@ jest.mock('expo-apple-authentication', () => ({
   isAvailableAsync: jest.fn().mockResolvedValue(true),
   signInAsync: jest.fn(),
   AppleAuthenticationScope: { FULL_NAME: 1, EMAIL: 2 },
+  AppleAuthenticationButtonType: { SIGN_IN: 0, CONTINUE: 1, SIGN_UP: 2 },
+  AppleAuthenticationButtonStyle: { WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2 },
+  AppleAuthenticationButton: 'AppleAuthenticationButton',
 }));
 
 jest.mock('@react-native-seoul/kakao-login', () => ({
