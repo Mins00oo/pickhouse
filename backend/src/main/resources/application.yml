@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: pickhouse-backend
+  profiles:
+    default: local
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+server:
+  port: 8080
+  forward-headers-strategy: framework
+pickhouse:
+  jwt:
+    issuer: https://api.pickhouse.app
+    access-token-ttl-seconds: 1800
+    refresh-token-ttl-seconds: 2592000
+    private-key-path: classpath:jwt-private.pem
+    public-key-path: classpath:jwt-public.pem
+  oauth:
+    apple:
+      audience: app.pickhouse.ios
+      jwks-url: https://appleid.apple.com/auth/keys
+    kakao:
+      jwks-url: https://kauth.kakao.com/.well-known/jwks.json
+      issuer: https://kauth.kakao.com
+      audience: ${KAKAO_REST_API_KEY:dummy-kakao-key}
+  r2:
+    endpoint: ${R2_ENDPOINT:https://example.r2.cloudflarestorage.com}
+    bucket: ${R2_BUCKET:pickhouse-photos}
+    access-key: ${R2_ACCESS_KEY:dummy}
+    secret-key: ${R2_SECRET_KEY:dummy}
+    public-base-url: ${R2_PUBLIC_BASE_URL:https://photos.pickhouse.app}
+    presign-ttl-seconds: 600
+  account:
+    grace-period-days: 30
