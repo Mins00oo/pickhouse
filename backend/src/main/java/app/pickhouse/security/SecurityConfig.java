@@ -29,7 +29,7 @@ public class SecurityConfig {
             .cors(c -> {})
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/auth/login", "/auth/refresh", "/actuator/health", "/actuator/health/**").permitAll()
+                .requestMatchers("/auth/login", "/auth/refresh", "/actuator/health", "/actuator/health/**", "/files/**").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) -> {
