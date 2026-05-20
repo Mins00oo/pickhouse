@@ -10,6 +10,7 @@ CREATE TABLE photos (
     created_at    DATETIME(3)  NOT NULL,
     deleted_at    DATETIME(3)  NULL,
     KEY ix_photos_user (user_id),
+    KEY ix_photos_user_deleted (user_id, deleted_at),
     KEY ix_photos_house (house_id),
     KEY ix_photos_residence (residence_id),
     CONSTRAINT fk_photos_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
