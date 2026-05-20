@@ -1,0 +1,11 @@
+.superpowers/
+node_modules/
+build/
+.gradle/
+target/
+*.iml
+.idea/
+.vscode/
+.env
+.env.local
+*.log
