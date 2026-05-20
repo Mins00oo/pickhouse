@@ -1,0 +1,12 @@
+.gradle/
+build/
+out/
+*.iml
+.idea/
+.vscode/
+HELP.md
+*.log
+.env
+.env.local
+src/main/resources/jwt-private.pem
+src/main/resources/jwt-public.pem
