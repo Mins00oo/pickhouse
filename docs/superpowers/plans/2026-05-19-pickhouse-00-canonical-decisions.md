@@ -171,21 +171,6 @@ interface House {
 
 The server mints `photoId` (UUID), writes the file to `{PICKHOUSE_STORAGE_PATH}/<photoId>.<ext>`, and stores a `Photo` row with `object_key=<photoId>.<ext>` and `remote_url=<base>/files/<photoId>.<ext>`.
 
-### PATCH `/photos/{id}` (link to parent later)
-
-Used when the photo was uploaded with no parent and the parent was created subsequently. Authenticated; only the owning user can call.
-
-**Request:**
-```json
-{ "houseId": "uuid" }    // OR
-{ "residenceId": "uuid" }
-```
-
-**Response (200 OK):** updated `PhotoDto` (same shape as upload response).
-
-- Photo's current parent must be `null` (no re-parenting via PATCH); attempts return 409 CONFLICT.
-- Setting both fields or neither → 400 BAD_REQUEST.
-
 ### Bulk-link via parent create — `POST /houses` and `POST /residences`
 
 When the parent is being created **after** the photos were uploaded (the typical "new entry" flow):

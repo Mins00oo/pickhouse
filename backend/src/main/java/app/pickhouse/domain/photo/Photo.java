@@ -27,4 +27,18 @@ public class Photo {
     @Column(name = "deleted_at") private Instant deletedAt;
 
     public void softDelete(Instant now) { this.deletedAt = now; }
+
+    public void linkToHouse(UUID houseId) {
+        if (this.houseId != null || this.residenceId != null) {
+            throw new IllegalStateException("photo already linked: " + this.id);
+        }
+        this.houseId = houseId;
+    }
+
+    public void linkToResidence(UUID residenceId) {
+        if (this.houseId != null || this.residenceId != null) {
+            throw new IllegalStateException("photo already linked: " + this.id);
+        }
+        this.residenceId = residenceId;
+    }
 }

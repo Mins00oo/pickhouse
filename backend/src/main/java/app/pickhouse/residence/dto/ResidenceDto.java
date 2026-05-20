@@ -9,6 +9,7 @@ import app.pickhouse.house.dto.MeterReadingsDto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record ResidenceDto(
@@ -29,6 +30,7 @@ public record ResidenceDto(
     String landlordMemo,
     String memo,
     MeterReadingsDto meterReadings,
+    List<UUID> moveInPhotoIds,
     UUID contractPhotoId,
     Instant createdAt,
     Instant updatedAt
@@ -48,9 +50,18 @@ public record ResidenceDto(
             r.getContractStartDate(), r.getContractEndDate(),
             r.getLandlordMemo(), r.getMemo(),
             buildMeterReadings(r),
+            buildMoveInPhotoIds(r, conv),
             r.getContractPhotoId(),
             r.getCreatedAt(), r.getUpdatedAt()
         );
+    }
+
+    private static List<UUID> buildMoveInPhotoIds(Residence r, JsonListConverter conv) {
+        java.util.List<String> raw = conv.fromJson(r.getMoveInPhotoIdsJson());
+        if (raw == null) return java.util.List.of();
+        java.util.List<UUID> out = new java.util.ArrayList<>(raw.size());
+        for (String s : raw) out.add(UUID.fromString(s));
+        return out;
     }
 
     private static MeterReadingsDto buildMeterReadings(Residence r) {

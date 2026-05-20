@@ -6,6 +6,7 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public record CreateHouseRequest(
     AddressDto address,
@@ -35,5 +36,6 @@ public record CreateHouseRequest(
     @Min(1) @Max(5) Integer moisture,
     @Min(1) @Max(5) Integer neighborhood,
     @Min(1) @Max(5) Integer firstImpression,
-    String memo
+    String memo,
+    List<UUID> photoIds
 ) {}

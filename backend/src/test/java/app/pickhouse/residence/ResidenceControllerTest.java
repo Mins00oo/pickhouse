@@ -51,7 +51,7 @@ class ResidenceControllerTest {
             id, null, "테스트 집", null, false, false,
             null, null, null, null, null, null,
             LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1),
-            null, null, null, null,
+            null, null, null, List.of(), null,
             Instant.now(), Instant.now()
         );
     }

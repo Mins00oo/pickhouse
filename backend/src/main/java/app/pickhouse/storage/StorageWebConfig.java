@@ -1,6 +1,7 @@
 package app.pickhouse.storage;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -8,6 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.nio.file.Paths;
 
 @Configuration
+@EnableConfigurationProperties(StorageProperties.class)
 @RequiredArgsConstructor
 public class StorageWebConfig implements WebMvcConfigurer {
 

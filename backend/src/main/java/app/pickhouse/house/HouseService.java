@@ -13,12 +13,14 @@ import app.pickhouse.house.dto.HouseDto;
 import app.pickhouse.house.dto.MeterReadingsDto;
 import app.pickhouse.house.dto.PromoteToResidenceRequest;
 import app.pickhouse.house.dto.UpdateHouseRequest;
+import app.pickhouse.photo.PhotoLinker;
 import app.pickhouse.residence.dto.ResidenceDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,6 +31,7 @@ public class HouseService {
     private final HouseRepository houses;
     private final ResidenceRepository residences;
     private final JsonListConverter conv;
+    private final PhotoLinker photoLinker;
 
     @Transactional(readOnly = true)
     public List<HouseDto> list(UUID userId) {
@@ -64,6 +67,9 @@ public class HouseService {
             .createdAt(now).updatedAt(now)
             .build();
         houses.save(h);
+        if (req.photoIds() != null && !req.photoIds().isEmpty()) {
+            photoLinker.linkToHouse(userId, req.photoIds(), h.getId());
+        }
         return HouseDto.from(h, conv);
     }
 
@@ -144,6 +150,7 @@ public class HouseService {
             .landlordMemo(req.landlordMemo())
             .isCurrent(Boolean.TRUE.equals(req.isCurrent()))
             .contractPhotoId(req.contractPhotoId())
+            .moveInPhotoIdsJson(conv.toJson(uuidStrings(req.moveInPhotoIds())))
             .meterElectricity(m != null ? m.electricity() : null)
             .meterWater(m != null ? m.water() : null)
             .meterGas(m != null ? m.gas() : null)
@@ -151,8 +158,25 @@ public class HouseService {
             .createdAt(now).updatedAt(now)
             .build();
         residences.save(r);
+        linkResidencePhotos(userId, r.getId(), req.moveInPhotoIds(), req.contractPhotoId());
         h.markPromoted(now);
         return ResidenceDto.from(r, conv);
+    }
+
+    private static List<String> uuidStrings(List<UUID> ids) {
+        if (ids == null) return null;
+        List<String> out = new ArrayList<>(ids.size());
+        for (UUID id : ids) out.add(id.toString());
+        return out;
+    }
+
+    private void linkResidencePhotos(UUID userId, UUID residenceId, List<UUID> moveInPhotoIds, UUID contractPhotoId) {
+        List<UUID> all = new ArrayList<>();
+        if (moveInPhotoIds != null) all.addAll(moveInPhotoIds);
+        if (contractPhotoId != null && !all.contains(contractPhotoId)) all.add(contractPhotoId);
+        if (!all.isEmpty()) {
+            photoLinker.linkToResidence(userId, all, residenceId);
+        }
     }
 
     private House findOwned(UUID userId, UUID id) {
