@@ -39,6 +39,8 @@ public class JwtVerifier {
             return new VerifiedClaims(userId, expectedType, jti, email);
         } catch (JWTVerificationException ex) {
             throw new ApiException(ErrorCode.INVALID_TOKEN, "invalid token: " + ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(ErrorCode.INVALID_TOKEN, "malformed token claim: " + ex.getMessage());
         }
     }
 
