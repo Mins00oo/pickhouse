@@ -1,4 +1,4 @@
-import { House } from '@/types';
+import { House, Residence } from '@/types';
 import { getApiClient } from './client';
 
 export const housesApi = {
@@ -28,8 +28,25 @@ export const housesApi = {
 
   async promoteToResidence(
     id: string,
-    body: { contractStartDate: string; contractEndDate: string; landlordMemo?: string },
-  ): Promise<void> {
-    await getApiClient().post(`/houses/${id}/promote-to-residence`, body);
+    body: {
+      name: string;
+      contractStartDate: string;
+      contractEndDate: string;
+      eraLabel?: string;
+      isFavorite?: boolean;
+      isCurrent?: boolean;
+      landlordMemo?: string;
+      meterReadings?: {
+        electricity?: number;
+        water?: number;
+        gas?: number;
+        recordedAt?: string;
+      };
+      moveInPhotoIds?: string[];
+      contractPhotoId?: string;
+    },
+  ): Promise<Residence> {
+    const res = await getApiClient().post<Residence>(`/houses/${id}/promote-to-residence`, body);
+    return res.data;
   },
 };
