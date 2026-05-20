@@ -14,6 +14,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 server:
   port: 8080
   forward-headers-strategy: framework
@@ -32,13 +36,10 @@ pickhouse:
       jwks-url: https://kauth.kakao.com/.well-known/jwks.json
       issuer: https://kauth.kakao.com
       audience: ${KAKAO_REST_API_KEY:dummy-kakao-key}
-  r2:
-    endpoint: ${R2_ENDPOINT:https://example.r2.cloudflarestorage.com}
-    bucket: ${R2_BUCKET:pickhouse-photos}
-    access-key: ${R2_ACCESS_KEY:dummy}
-    secret-key: ${R2_SECRET_KEY:dummy}
-    public-base-url: ${R2_PUBLIC_BASE_URL:https://photos.pickhouse.app}
-    presign-ttl-seconds: 600
+  storage:
+    path: ${PICKHOUSE_STORAGE_PATH:./uploads}
+    public-base-url: ${PICKHOUSE_PUBLIC_BASE_URL:http://localhost:8080}
+    max-file-size-bytes: 10485760
   account:
     grace-period-days: 30
 management:

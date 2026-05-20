@@ -25,8 +25,6 @@ dependencies {
     implementation("com.mysql:mysql-connector-j")
     implementation("com.auth0:java-jwt:4.4.0")
     implementation("com.auth0:jwks-rsa:0.22.1")
-    implementation("software.amazon.awssdk:s3:2.28.16")
-    implementation("software.amazon.awssdk:auth:2.28.16")
     compileOnly("org.projectlombok:lombok:1.18.34")
     annotationProcessor("org.projectlombok:lombok:1.18.34")
     testCompileOnly("org.projectlombok:lombok:1.18.34")
