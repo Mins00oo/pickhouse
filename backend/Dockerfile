@@ -8,7 +8,9 @@ RUN chmod +x gradlew && ./gradlew bootJar --no-daemon -x test
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN groupadd -r -g 1001 appuser && useradd -r -u 1001 -g appuser appuser
+RUN groupadd -r -g 1001 appuser && useradd -r -u 1001 -g appuser appuser \
+    && mkdir -p /var/lib/pickhouse/photos \
+    && chown -R appuser:appuser /var/lib/pickhouse
 COPY --from=build /workspace/build/libs/*.jar /app/app.jar
 USER appuser
 EXPOSE 8080
