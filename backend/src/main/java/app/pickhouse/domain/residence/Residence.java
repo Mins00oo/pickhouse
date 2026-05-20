@@ -15,7 +15,7 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class Residence {
 
     @Id @Column(columnDefinition = "CHAR(36)") private UUID id;
