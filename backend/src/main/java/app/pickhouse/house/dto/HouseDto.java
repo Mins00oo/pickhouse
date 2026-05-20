@@ -1,0 +1,63 @@
+package app.pickhouse.house.dto;
+
+import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.domain.house.DealType;
+import app.pickhouse.domain.house.House;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+public record HouseDto(
+    UUID id,
+    AddressDto address,
+    DealType dealType,
+    int deposit,
+    int rent,
+    Integer maintenanceFee,
+    BigDecimal area,
+    Integer builtYear,
+    Integer floor,
+    Integer totalFloor,
+    LocalDate availableFrom,
+    Integer stationDistance,
+    Integer rooms,
+    Integer bathrooms,
+    Boolean hasBalcony,
+    Boolean hasElevator,
+    Boolean hasParking,
+    List<String> options,
+    List<String> security,
+    String garbage,
+    Integer waterPressure,
+    Integer sunlight,
+    Integer noise,
+    Integer insulation,
+    Integer ventilation,
+    Integer moisture,
+    Integer neighborhood,
+    Integer firstImpression,
+    String memo,
+    Instant createdAt,
+    Instant updatedAt
+) {
+    public static HouseDto from(House h, JsonListConverter conv) {
+        return new HouseDto(
+            h.getId(),
+            AddressDto.from(h.getAddress()),
+            h.getDealType(),
+            h.getDeposit(), h.getRent(), h.getMaintenanceFee(),
+            h.getArea(), h.getBuiltYear(), h.getFloor(), h.getTotalFloor(),
+            h.getAvailableFrom(), h.getStationDistance(),
+            h.getRooms(), h.getBathrooms(),
+            h.getHasBalcony(), h.getHasElevator(), h.getHasParking(),
+            conv.fromJson(h.getOptionsJson()), conv.fromJson(h.getSecurityJson()),
+            h.getGarbage(),
+            h.getWaterPressure(), h.getSunlight(), h.getNoise(), h.getInsulation(),
+            h.getVentilation(), h.getMoisture(), h.getNeighborhood(), h.getFirstImpression(),
+            h.getMemo(), h.getCreatedAt(), h.getUpdatedAt()
+        );
+    }
+}
