@@ -50,6 +50,7 @@ CREATE TABLE residences (
     updated_at               DATETIME(3)  NOT NULL,
     deleted_at               DATETIME(3)  NULL,
     KEY ix_residences_user (user_id),
+    KEY ix_residences_user_deleted (user_id, deleted_at),
     KEY ix_residences_source (source_house_id),
     CONSTRAINT fk_residences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_residences_house FOREIGN KEY (source_house_id) REFERENCES houses(id) ON DELETE SET NULL
