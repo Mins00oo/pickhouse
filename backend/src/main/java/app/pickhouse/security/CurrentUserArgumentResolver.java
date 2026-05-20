@@ -29,6 +29,9 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         if (auth == null || auth.getPrincipal() == null) {
             throw new ApiException(ErrorCode.UNAUTHORIZED, "auth required");
         }
-        return auth.getPrincipal();
+        if (!(auth.getPrincipal() instanceof UUID uuid)) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED, "auth required");
+        }
+        return uuid;
     }
 }
