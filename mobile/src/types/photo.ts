@@ -7,7 +7,7 @@ export interface Photo {
   localUri?: string;
   remoteUrl?: string;
   uploadStatus: UploadStatus;
-  takenAt: string;
+  takenAt?: string;
   width?: number;
   height?: number;
   mimeType: string;
