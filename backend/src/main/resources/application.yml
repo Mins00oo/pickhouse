@@ -30,7 +30,7 @@ pickhouse:
     public-key-path: classpath:jwt-public.pem
   oauth:
     apple:
-      audience: app.pickhouse.ios
+      audience: ${APPLE_AUDIENCE:com.pickhouse.app}
       jwks-url: https://appleid.apple.com/auth/keys
     kakao:
       jwks-url: https://kauth.kakao.com/.well-known/jwks.json

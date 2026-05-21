@@ -37,5 +37,6 @@ public record CreateHouseRequest(
     @Min(1) @Max(5) Integer neighborhood,
     @Min(1) @Max(5) Integer firstImpression,
     String memo,
-    List<UUID> photoIds
+    List<UUID> photoIds,
+    UUID id
 ) {}

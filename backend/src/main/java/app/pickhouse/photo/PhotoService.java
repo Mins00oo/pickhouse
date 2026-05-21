@@ -28,6 +28,12 @@ public class PhotoService {
 
     @Transactional
     public PhotoDto upload(UUID userId, MultipartFile file, UUID houseId, UUID residenceId, Instant takenAt) {
+        return upload(userId, null, file, houseId, residenceId, takenAt);
+    }
+
+    @Transactional
+    public PhotoDto upload(UUID userId, UUID requestedPhotoId, MultipartFile file,
+                           UUID houseId, UUID residenceId, Instant takenAt) {
         if (file == null || file.isEmpty()) {
             throw new ApiException(ErrorCode.BAD_REQUEST, "file is required");
         }
@@ -43,7 +49,10 @@ public class PhotoService {
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "residence not found"));
         }
 
-        UUID photoId = UUID.randomUUID();
+        UUID photoId = requestedPhotoId != null ? requestedPhotoId : UUID.randomUUID();
+        if (requestedPhotoId != null && photos.existsById(requestedPhotoId)) {
+            throw new ApiException(ErrorCode.CONFLICT, "photo id already exists");
+        }
         LocalStorageService.Stored stored;
         try {
             stored = storage.save(file.getInputStream(), file.getSize(),

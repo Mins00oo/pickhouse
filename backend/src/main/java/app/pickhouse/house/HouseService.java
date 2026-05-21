@@ -6,6 +6,8 @@ import app.pickhouse.common.error.ErrorCode;
 import app.pickhouse.domain.common.Address;
 import app.pickhouse.domain.house.House;
 import app.pickhouse.domain.house.HouseRepository;
+import app.pickhouse.domain.photo.Photo;
+import app.pickhouse.domain.photo.PhotoRepository;
 import app.pickhouse.domain.residence.Residence;
 import app.pickhouse.domain.residence.ResidenceRepository;
 import app.pickhouse.house.dto.CreateHouseRequest;
@@ -32,23 +34,29 @@ public class HouseService {
     private final ResidenceRepository residences;
     private final JsonListConverter conv;
     private final PhotoLinker photoLinker;
+    private final PhotoRepository photos;
 
     @Transactional(readOnly = true)
     public List<HouseDto> list(UUID userId) {
         return houses.findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
-            .stream().map(h -> HouseDto.from(h, conv)).toList();
+            .stream().map(h -> HouseDto.from(h, conv, housePhotoIds(h.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public HouseDto get(UUID userId, UUID id) {
-        return HouseDto.from(findOwned(userId, id), conv);
+        House h = findOwned(userId, id);
+        return HouseDto.from(h, conv, housePhotoIds(h.getId()));
     }
 
     @Transactional
     public HouseDto create(UUID userId, CreateHouseRequest req) {
         Instant now = Instant.now();
+        UUID houseId = req.id() != null ? req.id() : UUID.randomUUID();
+        if (req.id() != null && houses.existsById(req.id())) {
+            throw new ApiException(ErrorCode.CONFLICT, "house id already exists");
+        }
         House h = House.builder()
-            .id(UUID.randomUUID()).userId(userId)
+            .id(houseId).userId(userId)
             .address(req.address() != null ? req.address().toEntity() : null)
             .dealType(req.dealType()).deposit(req.deposit()).rent(req.rent())
             .maintenanceFee(req.maintenanceFee())
@@ -70,7 +78,7 @@ public class HouseService {
         if (req.photoIds() != null && !req.photoIds().isEmpty()) {
             photoLinker.linkToHouse(userId, req.photoIds(), h.getId());
         }
-        return HouseDto.from(h, conv);
+        return HouseDto.from(h, conv, req.photoIds() != null ? req.photoIds() : List.of());
     }
 
     @Transactional
@@ -110,7 +118,7 @@ public class HouseService {
             .updatedAt(now)
             .build();
         houses.save(updated);
-        return HouseDto.from(updated, conv);
+        return HouseDto.from(updated, conv, housePhotoIds(updated.getId()));
     }
 
     @Transactional
@@ -182,5 +190,12 @@ public class HouseService {
     private House findOwned(UUID userId, UUID id) {
         return houses.findByIdAndUserIdAndDeletedAtIsNull(id, userId)
             .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "house not found"));
+    }
+
+    private List<UUID> housePhotoIds(UUID houseId) {
+        return photos.findByHouseIdAndDeletedAtIsNullOrderByCreatedAtAsc(houseId)
+            .stream()
+            .map(Photo::getId)
+            .toList();
     }
 }

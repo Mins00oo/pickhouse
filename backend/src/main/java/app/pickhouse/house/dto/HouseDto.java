@@ -40,10 +40,15 @@ public record HouseDto(
     Integer neighborhood,
     Integer firstImpression,
     String memo,
+    List<UUID> photoIds,
     Instant createdAt,
     Instant updatedAt
 ) {
     public static HouseDto from(House h, JsonListConverter conv) {
+        return from(h, conv, List.of());
+    }
+
+    public static HouseDto from(House h, JsonListConverter conv, List<UUID> photoIds) {
         return new HouseDto(
             h.getId(),
             AddressDto.from(h.getAddress()),
@@ -57,7 +62,7 @@ public record HouseDto(
             h.getGarbage(),
             h.getWaterPressure(), h.getSunlight(), h.getNoise(), h.getInsulation(),
             h.getVentilation(), h.getMoisture(), h.getNeighborhood(), h.getFirstImpression(),
-            h.getMemo(), h.getCreatedAt(), h.getUpdatedAt()
+            h.getMemo(), photoIds != null ? photoIds : List.of(), h.getCreatedAt(), h.getUpdatedAt()
         );
     }
 }

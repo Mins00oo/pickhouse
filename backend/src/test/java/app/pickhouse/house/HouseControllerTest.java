@@ -52,7 +52,7 @@ class HouseControllerTest {
             null, null, null, null, null,
             null, null, null,
             null, null, null, null, null, null, null, null,
-            null, Instant.now(), Instant.now());
+            null, List.of(), Instant.now(), Instant.now());
     }
 
     @Test

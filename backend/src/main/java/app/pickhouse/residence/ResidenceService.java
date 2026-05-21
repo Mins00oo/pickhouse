@@ -3,6 +3,8 @@ package app.pickhouse.residence;
 import app.pickhouse.common.JsonListConverter;
 import app.pickhouse.common.error.ApiException;
 import app.pickhouse.common.error.ErrorCode;
+import app.pickhouse.domain.photo.Photo;
+import app.pickhouse.domain.photo.PhotoRepository;
 import app.pickhouse.domain.residence.Residence;
 import app.pickhouse.domain.residence.ResidenceRepository;
 import app.pickhouse.house.dto.MeterReadingsDto;
@@ -26,24 +28,30 @@ public class ResidenceService {
     private final ResidenceRepository residences;
     private final JsonListConverter conv;
     private final PhotoLinker photoLinker;
+    private final PhotoRepository photos;
 
     @Transactional(readOnly = true)
     public List<ResidenceDto> list(UUID userId) {
         return residences.findByUserIdAndDeletedAtIsNullOrderByContractStartDateDesc(userId)
-            .stream().map(r -> ResidenceDto.from(r, conv)).toList();
+            .stream().map(r -> ResidenceDto.from(r, conv, residencePhotoIds(r.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public ResidenceDto get(UUID userId, UUID id) {
-        return ResidenceDto.from(findOwned(userId, id), conv);
+        Residence r = findOwned(userId, id);
+        return ResidenceDto.from(r, conv, residencePhotoIds(r.getId()));
     }
 
     @Transactional
     public ResidenceDto create(UUID userId, CreateResidenceRequest req) {
         Instant now = Instant.now();
         MeterReadingsDto m = req.meterReadings();
+        UUID residenceId = req.id() != null ? req.id() : UUID.randomUUID();
+        if (req.id() != null && residences.existsById(req.id())) {
+            throw new ApiException(ErrorCode.CONFLICT, "residence id already exists");
+        }
         Residence r = Residence.builder()
-            .id(UUID.randomUUID()).userId(userId)
+            .id(residenceId).userId(userId)
             .name(req.name())
             .eraLabel(req.eraLabel())
             .isFavorite(Boolean.TRUE.equals(req.isFavorite()))
@@ -74,7 +82,7 @@ public class ResidenceService {
             .build();
         residences.save(r);
         linkPhotos(userId, r.getId(), req.moveInPhotoIds(), req.contractPhotoId());
-        return ResidenceDto.from(r, conv);
+        return ResidenceDto.from(r, conv, List.of());
     }
 
     private static List<String> uuidStrings(List<UUID> ids) {
@@ -140,7 +148,7 @@ public class ResidenceService {
             .updatedAt(now)
             .build();
         residences.save(updated);
-        return ResidenceDto.from(updated, conv);
+        return ResidenceDto.from(updated, conv, residencePhotoIds(updated.getId()));
     }
 
     @Transactional
@@ -152,5 +160,12 @@ public class ResidenceService {
     private Residence findOwned(UUID userId, UUID id) {
         return residences.findByIdAndUserIdAndDeletedAtIsNull(id, userId)
             .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "residence not found"));
+    }
+
+    private List<UUID> residencePhotoIds(UUID residenceId) {
+        return photos.findByResidenceIdAndDeletedAtIsNullOrderByCreatedAtAsc(residenceId)
+            .stream()
+            .map(Photo::getId)
+            .toList();
     }
 }

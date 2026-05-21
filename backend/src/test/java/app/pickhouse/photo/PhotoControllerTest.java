@@ -52,7 +52,7 @@ class PhotoControllerTest {
         UUID photoId = UUID.randomUUID();
         PhotoDto dto = new PhotoDto(photoId, null, null, "https://api/files/" + photoId + ".jpg",
             null, Instant.now());
-        when(service.upload(eq(userId), any(), eq(null), eq(null), eq(null))).thenReturn(dto);
+        when(service.upload(eq(userId), eq(null), any(), eq(null), eq(null), eq(null))).thenReturn(dto);
 
         MockMultipartFile file = new MockMultipartFile("file", "x.jpg", "image/jpeg", "bytes".getBytes());
 
@@ -69,7 +69,7 @@ class PhotoControllerTest {
         UUID houseId = UUID.randomUUID();
         UUID photoId = UUID.randomUUID();
         PhotoDto dto = new PhotoDto(photoId, houseId, null, "url", null, Instant.now());
-        when(service.upload(eq(userId), any(), eq(houseId), eq(null), eq(null))).thenReturn(dto);
+        when(service.upload(eq(userId), eq(null), any(), eq(houseId), eq(null), eq(null))).thenReturn(dto);
 
         MockMultipartFile file = new MockMultipartFile("file", "x.jpg", "image/jpeg", "bytes".getBytes());
 
@@ -78,6 +78,22 @@ class PhotoControllerTest {
                 .with(authentication(auth(userId))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.houseId").value(houseId.toString()));
+    }
+
+    @Test
+    void upload_with_id_param_passes_to_service() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID photoId = UUID.randomUUID();
+        PhotoDto dto = new PhotoDto(photoId, null, null, "url", null, Instant.now());
+        when(service.upload(eq(userId), eq(photoId), any(), eq(null), eq(null), eq(null))).thenReturn(dto);
+
+        MockMultipartFile file = new MockMultipartFile("file", "x.jpg", "image/jpeg", "bytes".getBytes());
+
+        mvc.perform(multipart("/photos/upload").file(file)
+                .param("id", photoId.toString())
+                .with(authentication(auth(userId))))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(photoId.toString()));
     }
 
     @Test
