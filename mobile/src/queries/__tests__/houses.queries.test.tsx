@@ -11,9 +11,16 @@ jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 jest.mock('@/sync/syncQueue');
 
+let queryClient: QueryClient | null = null;
+
 const wrapper = ({ children }: { children: ReactNode }) => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 };
 
 beforeEach(() => {
@@ -24,6 +31,11 @@ beforeEach(() => {
     refreshToken: 'r',
     status: 'authenticated',
   });
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  queryClient = null;
 });
 
 describe('useHouses', () => {

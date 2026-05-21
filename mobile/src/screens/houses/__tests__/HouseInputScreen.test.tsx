@@ -11,10 +11,17 @@ jest.mock('@/sync/syncQueue');
 jest.mock('@/db/photos.repo');
 jest.mock('@/photos/cameraHelper');
 
+let queryClient: QueryClient | null = null;
+
 const wrap = (c: React.ReactNode) => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
   return (
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider client={queryClient}>
       <NavigationContainer>{c}</NavigationContainer>
     </QueryClientProvider>
   );
@@ -26,6 +33,11 @@ beforeEach(() => {
     user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a', refreshToken: 'r', status: 'authenticated',
   });
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  queryClient = null;
 });
 
 describe('HouseInputScreen', () => {

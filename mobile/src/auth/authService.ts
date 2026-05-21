@@ -61,7 +61,18 @@ export const authService = {
     useAuthStore.setState({
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      status: 'authenticated',
+      status: 'unknown',
     });
+    try {
+      const user = await authApi.me();
+      useAuthStore.getState().setSession({
+        user,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
+    } catch {
+      await secureTokens.clear();
+      useAuthStore.getState().clear();
+    }
   },
 };

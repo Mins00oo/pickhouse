@@ -1,4 +1,10 @@
 import '@testing-library/jest-native/extend-expect';
+import { act } from '@testing-library/react-native';
+import { notifyManager } from '@tanstack/react-query';
+
+notifyManager.setNotifyFunction((callback) => {
+  act(callback);
+});
 
 jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),

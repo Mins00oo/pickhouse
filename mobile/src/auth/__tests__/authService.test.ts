@@ -74,10 +74,21 @@ describe('authService', () => {
     expect(useAuthStore.getState().status).toBe('unauthenticated');
   });
 
-  it('restoreSession loads tokens and marks authenticated if present', async () => {
+  it('restoreSession loads tokens and fetches current user if present', async () => {
     (secureTokens.load as jest.Mock).mockResolvedValueOnce({ accessToken: 'a', refreshToken: 'r' });
+    (authApi.me as jest.Mock).mockResolvedValueOnce({
+      id: 'u1',
+      email: 'me@example.com',
+      nickname: 'picker',
+      authProviders: {},
+      createdAt: '',
+    });
+
     await authService.restoreSession();
+
+    expect(authApi.me).toHaveBeenCalled();
     expect(useAuthStore.getState().accessToken).toBe('a');
+    expect(useAuthStore.getState().user?.id).toBe('u1');
     expect(useAuthStore.getState().status).toBe('authenticated');
   });
 

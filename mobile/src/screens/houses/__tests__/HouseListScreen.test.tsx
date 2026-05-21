@@ -9,10 +9,12 @@ import { useAuthStore } from '@/stores/authStore';
 jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 
+let queryClient: QueryClient | null = null;
+
 const wrap = (c: React.ReactNode) => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return (
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider client={queryClient}>
       <NavigationContainer>{c}</NavigationContainer>
     </QueryClientProvider>
   );
@@ -26,6 +28,11 @@ beforeEach(() => {
     refreshToken: 'r',
     status: 'authenticated',
   });
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  queryClient = null;
 });
 
 describe('HouseListScreen', () => {

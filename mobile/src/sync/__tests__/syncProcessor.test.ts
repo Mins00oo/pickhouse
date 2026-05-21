@@ -36,6 +36,24 @@ describe('syncProcessor', () => {
     expect(syncQueueRepo.remove).toHaveBeenCalledWith(7);
   });
 
+  it('does not send pending local photoIds with create-house payload', async () => {
+    (networkMonitor.isOnline as jest.Mock).mockResolvedValueOnce(true);
+    (syncQueueRepo.list as jest.Mock).mockResolvedValueOnce([
+      {
+        id: 8,
+        opType: 'create',
+        entity: 'house',
+        entityId: 'h1',
+        payload: { id: 'h1', memo: 'with local photos', photoIds: ['p1'] },
+      },
+    ]);
+    (housesApi.create as jest.Mock).mockResolvedValueOnce({ id: 'h1' });
+
+    await syncProcessor.processOnce();
+
+    expect(housesApi.create).toHaveBeenCalledWith({ id: 'h1', memo: 'with local photos' });
+  });
+
   it('processes update-house then markClean and removes from queue', async () => {
     (networkMonitor.isOnline as jest.Mock).mockResolvedValueOnce(true);
     (syncQueueRepo.list as jest.Mock).mockResolvedValueOnce([

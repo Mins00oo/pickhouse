@@ -13,11 +13,15 @@ export const photoUploader = {
   async upload(input: UploadInput): Promise<string> {
     await photosRepo.markUploading(input.photoId);
     try {
-      const result = await photosApi.upload({
+      const uploadInput = {
         localUri: input.localUri,
         mimeType: input.mimeType,
-        houseId: input.houseId,
-        residenceId: input.residenceId,
+        photoId: input.photoId,
+        ...(input.houseId ? { houseId: input.houseId } : {}),
+        ...(input.residenceId ? { residenceId: input.residenceId } : {}),
+      };
+      const result = await photosApi.upload({
+        ...uploadInput,
       });
       await photosRepo.updateRemoteUrl(input.photoId, result.remoteUrl);
       return result.remoteUrl;

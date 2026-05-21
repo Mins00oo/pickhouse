@@ -6,13 +6,20 @@ import { networkMonitor } from './networkMonitor';
 
 const MAX_ATTEMPTS = 5;
 
+function withoutPhotoIds(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object') return payload;
+  const rest = { ...(payload as Record<string, unknown>) };
+  delete rest.photoIds;
+  return rest;
+}
+
 async function processOp(op: SyncOp): Promise<void> {
   if (op.entity === 'house') {
     if (op.opType === 'create') {
-      await housesApi.create(op.payload as never);
+      await housesApi.create(withoutPhotoIds(op.payload) as never);
       await housesRepo.markClean(op.entityId);
     } else if (op.opType === 'update') {
-      await housesApi.update(op.entityId, op.payload as never);
+      await housesApi.update(op.entityId, withoutPhotoIds(op.payload) as never);
       await housesRepo.markClean(op.entityId);
     } else if (op.opType === 'delete') {
       await housesApi.remove(op.entityId);

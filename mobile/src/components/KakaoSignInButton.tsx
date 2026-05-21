@@ -8,6 +8,7 @@ export interface KakaoSignInButtonProps {
 export function KakaoSignInButton({ onPress }: KakaoSignInButtonProps) {
   return (
     <Pressable
+      testID="kakao-sign-in"
       onPress={onPress}
       style={({ pressed }) => ({
         backgroundColor: '#FEE500',

@@ -28,6 +28,7 @@ describe('photoUploader', () => {
       localUri: 'file:///tmp/a.jpg',
       mimeType: 'image/jpeg',
       houseId: 'h1',
+      photoId: 'p1',
     });
     expect(photosRepo.updateRemoteUrl).toHaveBeenCalledWith('p1', '/uploads/p1.jpg');
     expect(remoteUrl).toBe('/uploads/p1.jpg');
