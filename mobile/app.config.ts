@@ -1,4 +1,4 @@
-import { ConfigContext, ExpoConfig } from 'expo/config';
+import { ConfigContext } from 'expo/config';
 
 const APP_ID = 'com.pickhouse.app';
 const KAKAO_NATIVE_APP_KEY = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ?? '';
@@ -15,7 +15,7 @@ if (REQUIRES_REMOTE_API_URL && (!API_BASE_URL || API_BASE_URL.includes('YOUR_LAN
   throw new Error('EXPO_PUBLIC_API_BASE_URL must point to your reachable backend URL for preview/production builds.');
 }
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+export default ({ config }: ConfigContext) => ({
   ...config,
   name: 'PickHouse',
   slug: 'pickhouse',
@@ -55,7 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#2E3A78',
     },
     permissions: ['CAMERA', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE'],
-  } as ExpoConfig['android'] & { usesCleartextTraffic: boolean },
+  },
   plugins: [
     'expo-apple-authentication',
     'expo-secure-store',
