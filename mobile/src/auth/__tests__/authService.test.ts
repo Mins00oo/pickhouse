@@ -17,17 +17,18 @@ beforeEach(() => {
 
 describe('authService', () => {
   it('loginWithApple gets token, calls backend, saves tokens, updates store', async () => {
+    const user = { id: 'u1', authProviders: { apple: 'a' }, createdAt: '' };
     (appleAuth.signIn as jest.Mock).mockResolvedValueOnce('apple-id');
     (authApi.login as jest.Mock).mockResolvedValueOnce({
       accessToken: 'a',
       refreshToken: 'r',
-      user: { id: 'u1', authProviders: { apple: 'a' }, createdAt: '' },
+      user,
     });
 
     await authService.loginWithApple();
 
     expect(authApi.login).toHaveBeenCalledWith({ provider: 'apple', idToken: 'apple-id' });
-    expect(secureTokens.save).toHaveBeenCalledWith({ accessToken: 'a', refreshToken: 'r' });
+    expect(secureTokens.save).toHaveBeenCalledWith({ accessToken: 'a', refreshToken: 'r', user });
     expect(useAuthStore.getState().status).toBe('authenticated');
     expect(useAuthStore.getState().user?.id).toBe('u1');
   });
@@ -63,6 +64,46 @@ describe('authService', () => {
     expect(secureTokens.save).toHaveBeenCalledWith({ accessToken: 'newA', refreshToken: 'newR' });
   });
 
+  it('refreshAccessToken does not clear the session when refresh fails from the network', async () => {
+    useAuthStore.setState({
+      user: { id: 'u1', authProviders: {}, createdAt: '' },
+      accessToken: 'old',
+      refreshToken: 'oldR',
+      status: 'authenticated',
+    });
+    (authApi.refresh as jest.Mock).mockRejectedValueOnce(new Error('Network Error'));
+
+    await expect(authService.refreshAccessToken()).rejects.toThrow('Network Error');
+
+    expect(secureTokens.clear).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().status).toBe('authenticated');
+    expect(useAuthStore.getState().refreshToken).toBe('oldR');
+  });
+
+  it('refreshAccessToken shares one backend refresh across concurrent callers', async () => {
+    useAuthStore.setState({
+      user: { id: 'u1', authProviders: {}, createdAt: '' },
+      accessToken: 'old',
+      refreshToken: 'oldR',
+      status: 'authenticated',
+    });
+    let resolveRefresh!: (value: { accessToken: string; refreshToken: string }) => void;
+    (authApi.refresh as jest.Mock).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }),
+    );
+
+    const first = authService.refreshAccessToken();
+    const second = authService.refreshAccessToken();
+
+    expect(authApi.refresh).toHaveBeenCalledTimes(1);
+    resolveRefresh({ accessToken: 'newA', refreshToken: 'newR' });
+    await expect(Promise.all([first, second])).resolves.toEqual(['newA', 'newA']);
+    expect(secureTokens.save).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().accessToken).toBe('newA');
+  });
+
   it('logout clears store and secure storage and calls kakao signOut', async () => {
     useAuthStore.setState({
       user: { id: 'u1', authProviders: {}, createdAt: '' },
@@ -90,6 +131,46 @@ describe('authService', () => {
     expect(useAuthStore.getState().accessToken).toBe('a');
     expect(useAuthStore.getState().user?.id).toBe('u1');
     expect(useAuthStore.getState().status).toBe('authenticated');
+  });
+
+  it('restoreSession keeps a saved user when /me fails from the network', async () => {
+    const savedUser = {
+      id: 'u1',
+      email: 'cached@example.com',
+      nickname: 'cached',
+      authProviders: {},
+      createdAt: '',
+    };
+    (secureTokens.load as jest.Mock).mockResolvedValueOnce({
+      accessToken: 'a',
+      refreshToken: 'r',
+      user: savedUser,
+    });
+    (authApi.me as jest.Mock).mockRejectedValueOnce(new Error('Network Error'));
+
+    await authService.restoreSession();
+
+    expect(secureTokens.clear).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().status).toBe('authenticated');
+    expect(useAuthStore.getState().user).toEqual(savedUser);
+    expect(useAuthStore.getState().accessToken).toBe('a');
+  });
+
+  it('restoreSession clears a saved session when /me is rejected as unauthorized', async () => {
+    (secureTokens.load as jest.Mock).mockResolvedValueOnce({
+      accessToken: 'a',
+      refreshToken: 'r',
+      user: { id: 'u1', authProviders: {}, createdAt: '' },
+    });
+    (authApi.me as jest.Mock).mockRejectedValueOnce({
+      response: { status: 401, data: { error: { message: 'auth required' } } },
+    });
+
+    await authService.restoreSession();
+
+    expect(secureTokens.clear).toHaveBeenCalled();
+    expect(kakaoAuth.signOut).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().status).toBe('unauthenticated');
   });
 
   it('restoreSession marks unauthenticated when no tokens', async () => {

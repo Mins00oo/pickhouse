@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getAuthErrorMessage, isAuthCancellation } from '@/auth/authErrors';
 import { authService } from '@/auth/authService';
 import { appleAuth } from '@/auth/appleAuth';
 import { AppleSignInButton } from '@/components/AppleSignInButton';
@@ -21,7 +22,8 @@ export function AuthScreen() {
     try {
       await authService.loginWithApple();
     } catch (e) {
-      Alert.alert('Apple 로그인 실패', e instanceof Error ? e.message : String(e));
+      if (isAuthCancellation(e)) return;
+      Alert.alert('Apple 로그인 실패', getAuthErrorMessage(e));
     }
   }
 
@@ -29,7 +31,8 @@ export function AuthScreen() {
     try {
       await authService.loginWithKakao();
     } catch (e) {
-      Alert.alert('카카오 로그인 실패', e instanceof Error ? e.message : String(e));
+      if (isAuthCancellation(e)) return;
+      Alert.alert('카카오 로그인 실패', getAuthErrorMessage(e));
     }
   }
 

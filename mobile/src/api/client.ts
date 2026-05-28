@@ -10,6 +10,11 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   _retried?: boolean;
 }
 
+function isAuthRefreshRoute(config: RetriableConfig): boolean {
+  const url = config.url ?? '';
+  return url === '/auth/login' || url === '/auth/refresh';
+}
+
 export function createApiClient(opts: ApiClientOptions): AxiosInstance {
   const client = axios.create({
     baseURL: opts.baseURL,
@@ -35,7 +40,7 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
     (resp) => resp,
     async (err: AxiosError) => {
       const cfg = err.config as RetriableConfig | undefined;
-      if (err.response?.status === 401 && cfg && !cfg._retried) {
+      if (err.response?.status === 401 && cfg && !cfg._retried && !isAuthRefreshRoute(cfg)) {
         cfg._retried = true;
         const newToken = await opts.onUnauthorized();
         if (newToken) {

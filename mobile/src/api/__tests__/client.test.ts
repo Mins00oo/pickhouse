@@ -43,4 +43,46 @@ describe('apiClient', () => {
     expect(onUnauthorized).toHaveBeenCalled();
     expect(adapter.mock.calls[1]![0].headers.Authorization).toBe('Bearer newtoken');
   });
+
+  it('does not refresh when /auth/login returns 401', async () => {
+    const onUnauthorized = jest.fn().mockResolvedValue('newtoken');
+    const client = createApiClient({
+      baseURL: 'http://test',
+      getAccessToken: async () => 'oldtoken',
+      onUnauthorized,
+    });
+    const adapter = jest.fn().mockImplementation((cfg) => {
+      const err: any = new Error('401');
+      err.response = { status: 401, data: {}, headers: {}, config: cfg };
+      err.config = cfg;
+      return Promise.reject(err);
+    });
+    client.defaults.adapter = adapter;
+
+    await expect(client.post('/auth/login', { provider: 'kakao', idToken: 'id' })).rejects.toThrow('401');
+
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh when /auth/refresh returns 401', async () => {
+    const onUnauthorized = jest.fn().mockResolvedValue('newtoken');
+    const client = createApiClient({
+      baseURL: 'http://test',
+      getAccessToken: async () => 'oldtoken',
+      onUnauthorized,
+    });
+    const adapter = jest.fn().mockImplementation((cfg) => {
+      const err: any = new Error('401');
+      err.response = { status: 401, data: {}, headers: {}, config: cfg };
+      err.config = cfg;
+      return Promise.reject(err);
+    });
+    client.defaults.adapter = adapter;
+
+    await expect(client.post('/auth/refresh', { refreshToken: 'r' })).rejects.toThrow('401');
+
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
 });
