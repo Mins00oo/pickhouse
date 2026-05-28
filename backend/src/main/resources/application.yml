@@ -8,6 +8,8 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
         jdbc:
           time_zone: UTC
         format_sql: false
