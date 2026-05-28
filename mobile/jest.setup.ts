@@ -43,3 +43,61 @@ jest.mock('@react-native-seoul/kakao-login', () => ({
 jest.mock('expo-network', () => ({
   getNetworkStateAsync: jest.fn().mockResolvedValue({ isConnected: true }),
 }));
+
+jest.mock('expo-location', () => ({
+  requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getCurrentPositionAsync: jest.fn().mockResolvedValue({
+    coords: { latitude: 37.5563, longitude: 126.9236 },
+  }),
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
+}));
+
+jest.mock(
+  '@mj-studio/react-native-naver-map',
+  () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const React = require('react');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Pressable, View } = require('react-native');
+    const naverMapMock = {
+      animateCameraTo: jest.fn(),
+      animateRegionTo: jest.fn(),
+      cancelAnimation: jest.fn(),
+      setLocationTrackingMode: jest.fn(),
+    };
+    const MockNaverMapView = React.forwardRef(({ children, testID = 'naver-map-view', ...props }: any, ref: any) => {
+      React.useImperativeHandle(ref, () => naverMapMock);
+      return React.createElement(View, { testID, ...props }, children);
+    });
+    MockNaverMapView.displayName = 'MockNaverMapView';
+
+    return {
+      __naverMapMock: naverMapMock,
+      NaverMapView: MockNaverMapView,
+      NaverMapMarkerOverlay: ({ latitude, longitude, onTap, testID, children, ...props }: any) =>
+        React.createElement(Pressable, {
+          testID: testID ?? `house-map-marker-${latitude}-${longitude}`,
+          onPress: onTap,
+          accessibilityLabel: `marker-${latitude}-${longitude}`,
+          ...props,
+        }, children),
+    };
+  },
+  { virtual: true },
+);
+
+jest.mock('@expo/vector-icons', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Text } = require('react-native');
+
+  return {
+    Ionicons: ({ name, testID }: { name: string; testID?: string }) =>
+      React.createElement(Text, { testID }, name),
+  };
+});

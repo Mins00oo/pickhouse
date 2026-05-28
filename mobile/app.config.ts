@@ -2,6 +2,7 @@ import { ConfigContext } from 'expo/config';
 
 const APP_ID = 'com.pickhouse.app';
 const KAKAO_NATIVE_APP_KEY = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ?? '';
+const NAVER_MAP_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID ?? '';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 const IS_EAS_BUILD = process.env.EAS_BUILD === 'true';
 const IS_PRODUCTION_BUILD = process.env.EAS_BUILD_PROFILE === 'production';
@@ -9,6 +10,10 @@ const REQUIRES_REMOTE_API_URL = IS_EAS_BUILD && ['preview', 'production'].includ
 
 if (IS_EAS_BUILD && !KAKAO_NATIVE_APP_KEY) {
   throw new Error('EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY is required for EAS development builds.');
+}
+
+if (IS_EAS_BUILD && !NAVER_MAP_CLIENT_ID) {
+  throw new Error('EXPO_PUBLIC_NAVER_MAP_CLIENT_ID is required for EAS development builds.');
 }
 
 if (REQUIRES_REMOTE_API_URL && (!API_BASE_URL || API_BASE_URL.includes('YOUR_LAN_IP'))) {
@@ -39,7 +44,7 @@ export default ({ config }: ConfigContext) => ({
       ...config.ios?.infoPlist,
       NSCameraUsageDescription: 'Use the camera to capture house photos.',
       NSPhotoLibraryUsageDescription: 'Use the photo library to choose house photos.',
-      NSLocationWhenInUseUsageDescription: 'Use location while entering addresses.',
+      NSLocationWhenInUseUsageDescription: 'Use your location to center the map around nearby house records.',
       ...(!IS_PRODUCTION_BUILD
         ? { NSAppTransportSecurity: { NSAllowsArbitraryLoads: true } }
         : {}),
@@ -54,7 +59,13 @@ export default ({ config }: ConfigContext) => ({
       backgroundImage: './assets/adaptive-bg.png',
       backgroundColor: '#2E3A78',
     },
-    permissions: ['CAMERA', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE'],
+    permissions: [
+      'CAMERA',
+      'READ_EXTERNAL_STORAGE',
+      'WRITE_EXTERNAL_STORAGE',
+      'ACCESS_FINE_LOCATION',
+      'ACCESS_COARSE_LOCATION',
+    ],
   },
   plugins: [
     'expo-apple-authentication',
@@ -70,13 +81,26 @@ export default ({ config }: ConfigContext) => ({
       },
     ],
     [
+      '@mj-studio/react-native-naver-map',
+      {
+        client_id: NAVER_MAP_CLIENT_ID,
+        android: {
+          ACCESS_FINE_LOCATION: true,
+          ACCESS_COARSE_LOCATION: true,
+        },
+      },
+    ],
+    [
       'expo-build-properties',
       {
         ios: {
           deploymentTarget: '15.1',
         },
         android: {
-          extraMavenRepos: ['https://devrepo.kakao.com/nexus/content/groups/public/'],
+          extraMavenRepos: [
+            'https://devrepo.kakao.com/nexus/content/groups/public/',
+            'https://repository.map.naver.com/archive/maven',
+          ],
         },
       },
     ],
