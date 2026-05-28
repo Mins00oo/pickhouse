@@ -71,6 +71,25 @@ class AppleIdTokenVerifierTest {
     }
 
     @Test
+    void accepts_not_before_within_clock_skew() {
+        String token = JWT.create()
+            .withIssuer("https://appleid.apple.com")
+            .withAudience("app.pickhouse.ios")
+            .withSubject("apple-user-123")
+            .withClaim("email", "u@apple.com")
+            .withIssuedAt(Date.from(Instant.now()))
+            .withNotBefore(Date.from(Instant.now().plusSeconds(30)))
+            .withExpiresAt(Date.from(Instant.now().plusSeconds(300)))
+            .withKeyId("k1")
+            .sign(Algorithm.RSA256((RSAPublicKey) keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate()));
+
+        OAuthVerifiedUser u = verifier.verify(token);
+
+        assertThat(u.providerId()).isEqualTo("apple-user-123");
+        assertThat(u.email()).isEqualTo("u@apple.com");
+    }
+
+    @Test
     void rejects_wrong_audience() {
         String token = JWT.create()
             .withIssuer("https://appleid.apple.com")

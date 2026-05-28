@@ -70,6 +70,25 @@ class KakaoIdTokenVerifierTest {
     }
 
     @Test
+    void accepts_not_before_within_clock_skew() {
+        String token = JWT.create()
+            .withIssuer("https://kauth.kakao.com")
+            .withAudience("kakao-app-key")
+            .withSubject("12345")
+            .withClaim("email", "u@kakao.com")
+            .withIssuedAt(Date.from(Instant.now()))
+            .withNotBefore(Date.from(Instant.now().plusSeconds(30)))
+            .withExpiresAt(Date.from(Instant.now().plusSeconds(300)))
+            .withKeyId("kk1")
+            .sign(Algorithm.RSA256((RSAPublicKey) keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate()));
+
+        OAuthVerifiedUser u = verifier.verify(token);
+
+        assertThat(u.providerId()).isEqualTo("12345");
+        assertThat(u.email()).isEqualTo("u@kakao.com");
+    }
+
+    @Test
     void rejects_invalid_signature() throws Exception {
         KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
         gen.initialize(2048);
@@ -83,5 +102,21 @@ class KakaoIdTokenVerifierTest {
             .withKeyId("kk1")
             .sign(Algorithm.RSA256((RSAPublicKey) other.getPublic(), (RSAPrivateKey) other.getPrivate()));
         assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejects_wrong_audience() {
+        String token = JWT.create()
+            .withIssuer("https://kauth.kakao.com")
+            .withAudience("other-app-key")
+            .withSubject("12345")
+            .withIssuedAt(Date.from(Instant.now()))
+            .withExpiresAt(Date.from(Instant.now().plusSeconds(300)))
+            .withKeyId("kk1")
+            .sign(Algorithm.RSA256((RSAPublicKey) keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate()));
+
+        assertThatThrownBy(() -> verifier.verify(token))
+            .isInstanceOf(ApiException.class)
+            .hasMessageContaining("Kakao ID token invalid");
     }
 }
