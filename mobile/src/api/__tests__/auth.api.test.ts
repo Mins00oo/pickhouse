@@ -33,4 +33,21 @@ describe('authApi', () => {
     expect(JSON.parse(cfg.data)).toEqual({ refreshToken: 'oldR' });
     expect(res.accessToken).toBe('newA');
   });
+
+  it('me GETs /me for session restoration', async () => {
+    const client = axios.create({ baseURL: 'http://test' });
+    const adapter = jest.fn().mockResolvedValue({
+      data: { id: 'u1', email: 'me@example.com', nickname: 'picker', createdAt: '2026-01-01T00:00:00Z' },
+      status: 200, headers: {}, config: {},
+    });
+    client.defaults.adapter = adapter;
+    setApiClient(client);
+
+    const res = await authApi.me();
+
+    const cfg = adapter.mock.calls[0]![0];
+    expect(cfg.url).toBe('/me');
+    expect(res.id).toBe('u1');
+    expect(res.nickname).toBe('picker');
+  });
 });

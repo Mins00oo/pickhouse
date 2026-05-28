@@ -2,6 +2,7 @@ package app.pickhouse.user;
 
 import app.pickhouse.common.error.ApiException;
 import app.pickhouse.common.error.ErrorCode;
+import app.pickhouse.auth.dto.UserDto;
 import app.pickhouse.domain.auth.RefreshTokenRepository;
 import app.pickhouse.domain.user.User;
 import app.pickhouse.domain.user.UserRepository;
@@ -20,6 +21,13 @@ public class UserService {
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
     private final AccountProperties accountProps;
+
+    @Transactional(readOnly = true)
+    public UserDto getSelf(UUID userId) {
+        User user = users.findById(userId)
+            .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "user not found"));
+        return UserDto.from(user);
+    }
 
     @Transactional
     public void softDeleteSelf(UUID userId) {

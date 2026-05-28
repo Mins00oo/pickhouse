@@ -1,6 +1,8 @@
 spring:
+  config:
+    import: optional:file:./secrets.local.yml
   datasource:
-    url: jdbc:mysql://localhost:3306/pickhouse?useUnicode=true&characterEncoding=utf8mb4&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: pickhouse
-    password: pickhouse
+    url: jdbc:mysql://localhost:${MYSQL_PORT:3307}/pickhouse?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${MYSQL_USER:pickhouse}
+    password: ${MYSQL_PASSWORD:pickhouse}
     driver-class-name: com.mysql.cj.jdbc.Driver

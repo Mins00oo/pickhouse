@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>pickhouse</title>
+<link rel="stylesheet" as="style" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  * { box-sizing: border-box; }
+  input, textarea, button { font-family: inherit; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- design tokens + data -->
+<script src="shared/tokens.js"></script>
+<script src="shared/data.js"></script>
+<script src="shared/geo.js"></script>
+<script type="text/babel" src="shared/visuals.jsx"></script>
+<script type="text/babel" src="shared/map.jsx"></script>
+
+<!-- ios + canvas chrome -->
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+
+<!-- screens -->
+<script type="text/babel" src="screens/records.jsx"></script>
+<script type="text/babel" src="screens/detail.jsx"></script>
+<script type="text/babel" src="screens/add.jsx"></script>
+<script type="text/babel" src="screens/compare.jsx"></script>
+<script type="text/babel" src="screens/profile.jsx"></script>
+
+<!-- app shell -->
+<script type="text/babel" src="app.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const W = 402, H = 874;
+
+function Phone({ initial, label }) {
+  return (
+    <div data-screen-label={label}>
+      <IOSDevice width={W} height={H}>
+        <PickhouseApp initial={initial}/>
+      </IOSDevice>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection
+        id="interactive"
+        title="pickhouse · 인터랙티브 앱"
+        subtitle="실제로 동작하는 프로토타입. 탭을 눌러 화면 전환, 핀이나 리스트를 눌러 상세, + 버튼으로 집 추가, '비교' 버튼으로 비교 시작.">
+        <DCArtboard id="app" label="앱 (인터랙티브)" width={W} height={H}>
+          <Phone label="App"/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection
+        id="snapshots"
+        title="화면 스냅샷"
+        subtitle="각 핵심 화면을 따로 보기 위한 정적 아트보드. 위 인터랙티브 앱으로도 모두 도달 가능."
+      >
+        <DCArtboard id="s-records" label="① 기록 · 메인 (지도)" width={W} height={H}>
+          <Phone initial={{ tab: 'records' }} label="01 Records · Map"/>
+        </DCArtboard>
+
+        <DCArtboard id="s-detail" label="② 집 상세" width={W} height={H}>
+          <Phone initial={{ tab: 'records', modal: { type: 'detail', id: 'h04' } }}
+            label="02 House detail"/>
+        </DCArtboard>
+
+        <DCArtboard id="s-add" label="③ 집 추가" width={W} height={H}>
+          <Phone initial={{ tab: 'records', modal: { type: 'add' } }}
+            label="03 Add visit"/>
+        </DCArtboard>
+
+        <DCArtboard id="s-compare" label="④ 비교 (1:1)" width={W} height={H}>
+          <Phone initial={{ tab: 'compare' }} label="04 Compare"/>
+        </DCArtboard>
+
+        <DCArtboard id="s-profile" label="⑤ 내 집들 · 타임라인" width={W} height={H}>
+          <Phone initial={{ tab: 'profile' }} label="05 Profile · Timeline"/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

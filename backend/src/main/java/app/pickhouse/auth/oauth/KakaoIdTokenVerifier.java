@@ -16,6 +16,8 @@ import java.security.interfaces.RSAPublicKey;
 @RequiredArgsConstructor
 public class KakaoIdTokenVerifier implements OAuthVerifier {
 
+    private static final long TOKEN_CLOCK_SKEW_SECONDS = 60L;
+
     private final KakaoApiClient kakao;
     private final OAuthProperties props;
 
@@ -30,6 +32,7 @@ public class KakaoIdTokenVerifier implements OAuthVerifier {
             DecodedJWT decoded = JWT.require(Algorithm.RSA256(pub, null))
                 .withIssuer(props.kakao().issuer())
                 .withAudience(props.kakao().audience())
+                .acceptLeeway(TOKEN_CLOCK_SKEW_SECONDS)
                 .build()
                 .verify(idToken);
             String sub = decoded.getSubject();

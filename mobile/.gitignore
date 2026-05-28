@@ -13,3 +13,6 @@ web-build/
 .env.local
 ios/
 android/
+
+# Brainstorming visual companion session files
+.superpowers/

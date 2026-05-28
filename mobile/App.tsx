@@ -4,13 +4,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { initializeApi } from '@/api/setup';
+import { resolveApiBaseUrl } from '@/api/baseUrl';
 import { authService } from '@/auth/authService';
 import { queryClient } from '@/queries/queryClient';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { useSyncOrchestrator } from '@/sync/useSyncOrchestrator';
 import { colors } from '@/theme';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
 function AppInner() {
   useSyncOrchestrator();
@@ -24,7 +23,7 @@ function AppInner() {
 
 export default function App() {
   useEffect(() => {
-    initializeApi(API_BASE_URL);
+    initializeApi(resolveApiBaseUrl());
     void authService.restoreSession();
   }, []);
 

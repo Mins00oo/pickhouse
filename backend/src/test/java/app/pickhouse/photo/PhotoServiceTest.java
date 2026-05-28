@@ -67,6 +67,21 @@ class PhotoServiceTest {
     }
 
     @Test
+    void upload_with_client_generated_id_saves_that_id() {
+        UUID userId = UUID.randomUUID();
+        UUID photoId = UUID.randomUUID();
+        when(storage.save(any(), anyLong(), eq("image/jpeg"), eq(photoId)))
+            .thenReturn(new LocalStorageService.Stored(photoId + ".jpg", "https://api/files/" + photoId + ".jpg"));
+
+        PhotoDto dto = service.upload(userId, photoId, jpeg(), null, null, null);
+
+        assertThat(dto.id()).isEqualTo(photoId);
+        ArgumentCaptor<Photo> captor = ArgumentCaptor.forClass(Photo.class);
+        verify(photos).save(captor.capture());
+        assertThat(captor.getValue().getId()).isEqualTo(photoId);
+    }
+
+    @Test
     void upload_with_houseId_validates_ownership_then_saves_with_houseId() {
         UUID userId = UUID.randomUUID();
         UUID houseId = UUID.randomUUID();

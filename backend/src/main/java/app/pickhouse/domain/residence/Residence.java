@@ -4,6 +4,8 @@ import app.pickhouse.domain.common.Address;
 import app.pickhouse.domain.house.DealType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -59,14 +61,14 @@ public class Residence {
     @Column(name = "security_json", columnDefinition = "json") private String securityJson;
     @Column private String garbage;
 
-    @Column(name = "water_pressure") private Integer waterPressure;
-    @Column private Integer sunlight;
-    @Column private Integer noise;
-    @Column private Integer insulation;
-    @Column private Integer ventilation;
-    @Column private Integer moisture;
-    @Column private Integer neighborhood;
-    @Column(name = "first_impression") private Integer firstImpression;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column(name = "water_pressure") private Integer waterPressure;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column private Integer sunlight;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column private Integer noise;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column private Integer insulation;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column private Integer ventilation;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column private Integer moisture;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column private Integer neighborhood;
+    @JdbcTypeCode(SqlTypes.TINYINT) @Column(name = "first_impression") private Integer firstImpression;
 
     @Column(columnDefinition = "TEXT") private String memo;
 

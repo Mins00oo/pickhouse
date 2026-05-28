@@ -16,11 +16,15 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
@@ -44,6 +48,21 @@ class UserControllerTest {
 
     @Autowired MockMvc mvc;
     @MockBean UserService userService;
+
+    @Test
+    void get_me_returns_current_user() throws Exception {
+        UUID userId = UUID.randomUUID();
+        var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of());
+        when(userService.getSelf(userId)).thenReturn(
+            new app.pickhouse.auth.dto.UserDto(userId, "me@example.com", "picker", Instant.now())
+        );
+
+        mvc.perform(get("/me").with(authentication(auth)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(userId.toString()))
+            .andExpect(jsonPath("$.email").value("me@example.com"))
+            .andExpect(jsonPath("$.nickname").value("picker"));
+    }
 
     @Test
     void delete_me_returns_204_and_calls_service() throws Exception {

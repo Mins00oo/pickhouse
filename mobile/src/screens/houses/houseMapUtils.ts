@@ -1,0 +1,146 @@
+import { House, RATING_KEYS } from '@/types';
+
+export type MapCoordinate = {
+  latitude: number;
+  longitude: number;
+};
+
+export type MapRegion = MapCoordinate & {
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+export const DEFAULT_MAP_CENTER: MapCoordinate = {
+  latitude: 37.5563,
+  longitude: 126.9236,
+};
+
+export function getHouseCoordinate(house: House): MapCoordinate | null {
+  const { latitude, longitude } = house.address;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
+export function getHouseTitle(house: House): string {
+  const detail = house.address.detail?.trim();
+  if (detail) return detail;
+  return house.address.roadAddress?.trim() || house.address.jibunAddress?.trim() || '주소 미입력';
+}
+
+export function getHouseSubtitle(house: House): string {
+  const detail = house.address.detail?.trim();
+  const road = house.address.roadAddress?.trim();
+  const jibun = house.address.jibunAddress?.trim();
+
+  if (detail && road) return road;
+  if (detail && jibun) return jibun;
+  if (road && jibun && road !== jibun) return jibun;
+  if (house.address.zonecode) return `우편번호 ${house.address.zonecode}`;
+  return '주소 정보 없음';
+}
+
+export function getDealTypeLabel(house: House): string {
+  if (house.dealType === 'JEONSE') return '전세';
+  if (house.dealType === 'BAN_JEONSE') return '반전세';
+  return '월세';
+}
+
+export function formatHousePrice(house: House): string {
+  const deposit = house.deposit.toLocaleString('ko-KR');
+  if (house.dealType === 'JEONSE') return `전세 ${deposit}`;
+
+  const rent = (house.rent ?? 0).toLocaleString('ko-KR');
+  return `${getDealTypeLabel(house)} ${deposit} / ${rent}`;
+}
+
+export function formatDepositShort(amount: number): string {
+  if (amount >= 10000) {
+    const eok = amount / 10000;
+    return Number.isInteger(eok) ? `${eok}억` : `${eok.toFixed(1)}억`;
+  }
+  return amount.toLocaleString('ko-KR');
+}
+
+export function formatHousePriceShort(house: House): string {
+  if (house.dealType === 'JEONSE') return `전세 ${formatDepositShort(house.deposit)}`;
+  return `${formatDepositShort(house.deposit)}/${house.rent ?? 0}`;
+}
+
+export function getHouseMeta(house: House): string {
+  const parts: string[] = [];
+  if (typeof house.area === 'number') parts.push(`${house.area}평`);
+  if (typeof house.floor === 'number' && typeof house.totalFloor === 'number') {
+    parts.push(`${house.floor}/${house.totalFloor}층`);
+  } else if (typeof house.floor === 'number') {
+    parts.push(`${house.floor}층`);
+  }
+  if (typeof house.rooms === 'number') parts.push(`방 ${house.rooms}`);
+  return parts.join(' · ');
+}
+
+export function getAverageRating(house: House): number {
+  const values: number[] = [];
+  for (const key of RATING_KEYS) {
+    const value = house[key];
+    if (typeof value === 'number') values.push(value);
+  }
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+export function getVisitedLabel(house: House): string {
+  const date = new Date(house.createdAt);
+  if (Number.isNaN(date.getTime())) return '기록일 없음';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+  }).format(date);
+}
+
+export function filterHousesByKeyword(houses: House[], keyword: string): House[] {
+  const query = keyword.trim().toLocaleLowerCase('ko-KR');
+  if (!query) return houses;
+
+  return houses.filter((house) => {
+    const fields = [
+      house.address.detail,
+      house.address.roadAddress,
+      house.address.jibunAddress,
+      house.address.zonecode,
+    ];
+
+    return fields.some((field) => field?.toLocaleLowerCase('ko-KR').includes(query));
+  });
+}
+
+export function isHouseInRegion(house: House, region: MapRegion): boolean {
+  const coordinate = getHouseCoordinate(house);
+  if (!coordinate) return false;
+
+  const north = region.latitude + region.latitudeDelta;
+  const south = region.latitude;
+  const east = region.longitude + region.longitudeDelta;
+  const west = region.longitude;
+
+  return (
+    coordinate.latitude >= south &&
+    coordinate.latitude <= north &&
+    coordinate.longitude >= west &&
+    coordinate.longitude <= east
+  );
+}
+
+export function filterHousesByRegion(houses: House[], region: MapRegion | null): House[] {
+  const housesWithCoordinates = houses.filter((house) => Boolean(getHouseCoordinate(house)));
+  if (!region) return housesWithCoordinates;
+  return housesWithCoordinates.filter((house) => isHouseInRegion(house, region));
+}
+
+export function sortHousesForMapSheet(houses: House[], selectedHouseId: string | null): House[] {
+  return [...houses].sort((a, b) => {
+    if (a.id === selectedHouseId) return -1;
+    if (b.id === selectedHouseId) return 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+}

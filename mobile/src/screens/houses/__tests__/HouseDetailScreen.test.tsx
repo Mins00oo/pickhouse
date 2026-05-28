@@ -9,10 +9,12 @@ jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 jest.mock('@/db/photos.repo');
 
+let queryClient: QueryClient | null = null;
+
 const wrap = (c: React.ReactNode) => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return (
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider client={queryClient}>
       <NavigationContainer>{c}</NavigationContainer>
     </QueryClientProvider>
   );
@@ -38,4 +40,9 @@ describe('HouseDetailScreen', () => {
       expect(await findByText(/햇빛 잘 듦/)).toBeTruthy();
     });
   });
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  queryClient = null;
 });

@@ -46,5 +46,6 @@ public record CreateResidenceRequest(
     String landlordMemo,
     MeterReadingsDto meterReadings,
     List<UUID> moveInPhotoIds,
-    UUID contractPhotoId
+    UUID contractPhotoId,
+    UUID id
 ) {}

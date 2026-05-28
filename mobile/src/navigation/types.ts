@@ -2,14 +2,16 @@ export type AuthStackParamList = {
   Auth: undefined;
 };
 
-export type HouseStackParamList = {
+export type MainTabParamList = {
+  Home: undefined;
   HouseList: undefined;
-  HouseInput: { houseId?: string } | undefined;
-  HouseDetail: { houseId: string };
+  My: undefined;
 };
 
-export type MainTabParamList = {
-  Houses: undefined;
+export type HouseStackParamList = {
+  MainTabs: undefined;
+  HouseInput: { houseId?: string } | undefined;
+  HouseDetail: { houseId: string };
 };
 
 declare global {

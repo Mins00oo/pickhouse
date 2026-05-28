@@ -20,7 +20,7 @@ pickhouse:
     kakao:
       jwks-url: https://kauth.kakao.com/.well-known/jwks.json
       issuer: https://kauth.kakao.com
-      audience: ${KAKAO_REST_API_KEY}
+      audience: ${KAKAO_ID_TOKEN_AUDIENCE:${KAKAO_REST_API_KEY}}
   storage:
     path: ${PICKHOUSE_STORAGE_PATH:/var/lib/pickhouse/photos}
     public-base-url: ${PICKHOUSE_PUBLIC_BASE_URL:https://api.pickhouse.app}

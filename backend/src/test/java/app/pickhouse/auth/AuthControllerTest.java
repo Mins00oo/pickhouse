@@ -2,6 +2,7 @@ package app.pickhouse.auth;
 
 import app.pickhouse.auth.dto.LoginResponse;
 import app.pickhouse.auth.dto.UserDto;
+import app.pickhouse.domain.user.OAuthProvider;
 import app.pickhouse.security.JwtAuthFilter;
 import app.pickhouse.security.JwtVerifier;
 import app.pickhouse.security.SecurityConfig;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -62,6 +64,21 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.accessToken").value("acc.jwt"))
             .andExpect(jsonPath("$.refreshToken").value("ref.jwt"))
             .andExpect(jsonPath("$.user.nickname").value("닉네임"));
+    }
+
+    @Test
+    void login_accepts_lowercase_provider_from_mobile() throws Exception {
+        Instant now = Instant.now();
+        UserDto user = new UserDto(UUID.randomUUID(), "x@k.com", "picker", now);
+        when(authService.login(argThat(req -> req.provider() == OAuthProvider.APPLE)))
+            .thenReturn(new LoginResponse("acc.jwt", "ref.jwt", user));
+
+        String body = """
+            {"provider":"apple","idToken":"abc"}
+            """;
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.accessToken").value("acc.jwt"));
     }
 
     @Test

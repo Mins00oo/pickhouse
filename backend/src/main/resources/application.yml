@@ -8,6 +8,8 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
         jdbc:
           time_zone: UTC
         format_sql: false
@@ -30,12 +32,12 @@ pickhouse:
     public-key-path: classpath:jwt-public.pem
   oauth:
     apple:
-      audience: app.pickhouse.ios
+      audience: ${APPLE_AUDIENCE:com.pickhouse.app}
       jwks-url: https://appleid.apple.com/auth/keys
     kakao:
       jwks-url: https://kauth.kakao.com/.well-known/jwks.json
       issuer: https://kauth.kakao.com
-      audience: ${KAKAO_REST_API_KEY:dummy-kakao-key}
+      audience: ${KAKAO_ID_TOKEN_AUDIENCE:${KAKAO_REST_API_KEY:dummy-kakao-key}}
   storage:
     path: ${PICKHOUSE_STORAGE_PATH:./uploads}
     public-base-url: ${PICKHOUSE_PUBLIC_BASE_URL:http://localhost:8080}

@@ -1,4 +1,4 @@
-import { LoginRequest, LoginResponse, RefreshResponse } from '@/types';
+import { LoginRequest, LoginResponse, RefreshResponse, User } from '@/types';
 import { getApiClient } from './client';
 
 export const authApi = {
@@ -9,6 +9,11 @@ export const authApi = {
 
   async refresh(refreshToken: string): Promise<RefreshResponse> {
     const res = await getApiClient().post<RefreshResponse>('/auth/refresh', { refreshToken });
+    return res.data;
+  },
+
+  async me(): Promise<User> {
+    const res = await getApiClient().get<User>('/me');
     return res.data;
   },
 };

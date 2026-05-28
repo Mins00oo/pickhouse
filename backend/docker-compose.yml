@@ -8,7 +8,7 @@ services:
       MYSQL_USER: pickhouse
       MYSQL_PASSWORD: pickhouse
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - pickhouse-mysql-data:/var/lib/mysql
     healthcheck:

@@ -35,8 +35,10 @@ export function useSyncOrchestrator() {
     if (status !== 'authenticated') return;
     let timer: ReturnType<typeof setInterval> | null = null;
     const kick = () => {
-      void syncProcessor.processOnce();
-      void processPendingPhotos();
+      void (async () => {
+        await syncProcessor.processOnce();
+        await processPendingPhotos();
+      })();
     };
 
     kick();

@@ -17,6 +17,7 @@ import java.security.interfaces.RSAPublicKey;
 public class AppleIdTokenVerifier implements OAuthVerifier {
 
     private static final String APPLE_ISSUER = "https://appleid.apple.com";
+    private static final long TOKEN_CLOCK_SKEW_SECONDS = 60L;
 
     private final AppleJwksClient jwks;
     private final OAuthProperties props;
@@ -33,6 +34,7 @@ public class AppleIdTokenVerifier implements OAuthVerifier {
             DecodedJWT decoded = JWT.require(Algorithm.RSA256(publicKey, null))
                 .withIssuer(APPLE_ISSUER)
                 .withAudience(props.apple().audience())
+                .acceptLeeway(TOKEN_CLOCK_SKEW_SECONDS)
                 .build()
                 .verify(idToken);
             String sub = decoded.getSubject();

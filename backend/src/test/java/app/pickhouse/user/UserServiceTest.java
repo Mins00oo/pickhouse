@@ -52,6 +52,26 @@ class UserServiceTest {
     }
 
     @Test
+    void getSelf_returns_current_user_dto() {
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.now();
+        User user = User.builder()
+            .id(id)
+            .email("me@example.com")
+            .nickname("picker")
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        when(users.findById(id)).thenReturn(Optional.of(user));
+
+        var dto = service.getSelf(id);
+
+        assertThat(dto.id()).isEqualTo(id);
+        assertThat(dto.email()).isEqualTo("me@example.com");
+        assertThat(dto.nickname()).isEqualTo("picker");
+    }
+
+    @Test
     void softDeleteSelf_is_noop_when_user_already_soft_deleted() {
         UUID id = UUID.randomUUID();
         Instant past = Instant.parse("2026-01-01T00:00:00Z");

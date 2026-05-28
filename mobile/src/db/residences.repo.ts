@@ -1,4 +1,4 @@
-import { Residence, RatingKey } from '@/types';
+import { Residence } from '@/types';
 import { getDatabase } from './database';
 
 type ResidenceRow = {

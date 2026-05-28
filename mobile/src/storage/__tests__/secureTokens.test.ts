@@ -12,12 +12,35 @@ describe('secureTokens', () => {
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith('ph_refresh_token', 'r');
   });
 
-  it('load returns both tokens when present', async () => {
+  it('save writes a user snapshot when provided', async () => {
+    const user = { id: 'u1', email: 'u@example.com', authProviders: {}, createdAt: '' };
+
+    await secureTokens.save({ accessToken: 'a', refreshToken: 'r', user });
+
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('ph_user', JSON.stringify(user));
+  });
+
+  it('load returns tokens and user snapshot when present', async () => {
     (SecureStore.getItemAsync as jest.Mock)
       .mockResolvedValueOnce('a')
-      .mockResolvedValueOnce('r');
+      .mockResolvedValueOnce('r')
+      .mockResolvedValueOnce(JSON.stringify({
+        id: 'u1',
+        email: 'u@example.com',
+        authProviders: {},
+        createdAt: '',
+      }));
     const t = await secureTokens.load();
-    expect(t).toEqual({ accessToken: 'a', refreshToken: 'r' });
+    expect(t).toEqual({
+      accessToken: 'a',
+      refreshToken: 'r',
+      user: {
+        id: 'u1',
+        email: 'u@example.com',
+        authProviders: {},
+        createdAt: '',
+      },
+    });
   });
 
   it('load returns null when access is missing', async () => {
@@ -32,5 +55,6 @@ describe('secureTokens', () => {
     await secureTokens.clear();
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('ph_access_token');
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('ph_refresh_token');
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('ph_user');
   });
 });

@@ -25,11 +25,12 @@ public class PhotoController {
     @ResponseStatus(HttpStatus.CREATED)
     public PhotoDto upload(
         @CurrentUserId UUID userId,
+        @RequestParam(value = "id", required = false) UUID id,
         @RequestParam("file") MultipartFile file,
         @RequestParam(value = "houseId", required = false) UUID houseId,
         @RequestParam(value = "residenceId", required = false) UUID residenceId,
         @RequestParam(value = "takenAt", required = false) Instant takenAt
     ) {
-        return service.upload(userId, file, houseId, residenceId, takenAt);
+        return service.upload(userId, id, file, houseId, residenceId, takenAt);
     }
 }

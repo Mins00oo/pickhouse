@@ -48,10 +48,14 @@ class ResidenceControllerTest {
 
     private static ResidenceDto sample(UUID id) {
         return new ResidenceDto(
-            id, null, "테스트 집", null, false, false,
+            id, null, "sample", null, false, false,
             null, null, null, null, null, null,
+            null, null, null, null, null,
+            null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null,
+            null, List.of(),
             LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1),
-            null, null, null, List.of(), null,
+            null, null, List.of(), null,
             Instant.now(), Instant.now()
         );
     }
@@ -63,13 +67,13 @@ class ResidenceControllerTest {
         when(service.create(eq(userId), any())).thenReturn(sample(rId));
 
         String body = """
-            {"name":"테스트 집","contractStartDate":"2024-01-01","contractEndDate":"2026-01-01"}
+            {"name":"sample","contractStartDate":"2024-01-01","contractEndDate":"2026-01-01"}
             """;
         mvc.perform(post("/residences").with(authentication(auth(userId)))
                 .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(rId.toString()))
-            .andExpect(jsonPath("$.name").value("테스트 집"));
+            .andExpect(jsonPath("$.name").value("sample"));
     }
 
     @Test
