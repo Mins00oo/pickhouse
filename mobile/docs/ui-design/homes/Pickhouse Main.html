@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pickhouse — 메인 화면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"/>
+<style>
+  html, body { margin: 0; padding: 0; font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #F4F1EA; }
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  /* hide scrollbar in carousel */
+  *::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="pickhouse-shared.jsx"></script>
+<script type="text/babel" src="pickhouse-main.jsx"></script>
+
+<script type="text/babel">
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+  const { MainScreen } = window;
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection
+          id="main"
+          title="메인 화면"
+          subtitle="카드를 좌우로 스와이프하면 지도의 핀이 따라 이동합니다 — 아래 카드를 옆으로 끌어보세요"
+        >
+          <DCArtboard id="m1" label="① 청파동 선택" width={402} height={874}>
+            <MainScreen initialSelected={1}/>
+          </DCArtboard>
+          <DCArtboard id="m2" label="② 서계동 선택 — 핀도 이동" width={402} height={874}>
+            <MainScreen initialSelected={3}/>
+          </DCArtboard>
+          <DCArtboard id="m3" label="③ 갈월동 선택" width={402} height={874}>
+            <MainScreen initialSelected={5}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="zoom"
+          title="줌 레벨별 지도 표현"
+          subtitle="지도를 확대·축소했을 때 핀이 어떻게 변하는지"
+        >
+          <DCArtboard id="z1" label="① 줌아웃 · 동 단위 클러스터" width={402} height={874}>
+            <MainScreen initialSelected={3} zoom="far" showZoomBadge/>
+          </DCArtboard>
+          <DCArtboard id="z2" label="② 기본 · 구역 단위 가격 핀" width={402} height={874}>
+            <MainScreen initialSelected={3} zoom="medium" showZoomBadge/>
+          </DCArtboard>
+          <DCArtboard id="z3" label="③ 줌인 · 건물 단위 상세 핀" width={402} height={874}>
+            <MainScreen initialSelected={3} zoom="close" showZoomBadge/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="filter"
+          title="필터 시트"
+          subtitle="상단 필터 버튼을 눌렀을 때 — 거래유형 · 금액 · 평수 · 방수"
+        >
+          <DCArtboard id="f1" label="필터 열림" width={402} height={874}>
+            <MainScreen initialSelected={3} filterOpen/>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
