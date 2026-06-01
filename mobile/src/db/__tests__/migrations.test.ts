@@ -21,6 +21,15 @@ describe('migrations', () => {
     expect(allSql).toMatch(/CREATE TABLE.*sync_queue/);
   });
 
+  it('creates the anchor_places table with a one-per-type unique index in v3', () => {
+    const v3 = migrations.find((m) => m.version === 3);
+    expect(v3).toBeDefined();
+    const sql = v3!.sql;
+    expect(sql).toMatch(/CREATE TABLE.*anchor_places/s);
+    expect(sql).toMatch(/anchor_type TEXT NOT NULL/);
+    expect(sql).toMatch(/CREATE UNIQUE INDEX.*anchor_places\(user_id, anchor_type\)/s);
+  });
+
   it('adds the add-house wizard columns in migration v2', () => {
     const v2 = migrations.find((m) => m.version === 2);
     expect(v2).toBeDefined();

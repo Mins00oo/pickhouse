@@ -12,6 +12,7 @@ import { colors, conditionColor, conditionLabel, spacing, typography } from '@/t
 import { photosRepo } from '@/db/photos.repo';
 import { CONDITION_KEYS, CONDITION_META, normalizeConditionLevel } from './conditionMeta';
 import { directionLabel, roomTypeLabel } from './wizardConstants';
+import { AnchorDistanceCard } from './components/AnchorDistanceCard';
 
 type Props = NativeStackScreenProps<HouseStackParamList, 'HouseDetail'>;
 
@@ -84,6 +85,8 @@ export function HouseDetailScreen({ route, navigation }: Props) {
             </Text>
           ) : null}
         </Card>
+
+        <AnchorDistanceCard house={house} />
 
         {(house.area ||
           house.floor ||

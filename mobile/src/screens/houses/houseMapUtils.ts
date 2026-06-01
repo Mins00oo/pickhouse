@@ -1,4 +1,4 @@
-import { House, RATING_KEYS } from '@/types';
+import { AnchorDistance, AnchorPlace, House, RATING_KEYS } from '@/types';
 
 export type MapCoordinate = {
   latitude: number;
@@ -20,6 +20,45 @@ export function getHouseCoordinate(house: House): MapCoordinate | null {
   if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
+}
+
+export function getAnchorCoordinate(anchor: AnchorPlace): MapCoordinate | null {
+  const { latitude, longitude } = anchor.address;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
+/** 두 좌표 간 직선거리(km) — 하버사인. */
+export function haversineKm(a: MapCoordinate, b: MapCoordinate): number {
+  const R = 6371; // 지구 반지름(km)
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/** km 표시: 1km 미만은 m 단위(반올림 10m), 그 이상은 소수 1자리 km. */
+export function formatKm(km: number): string {
+  if (km < 1) {
+    const m = Math.round((km * 1000) / 10) * 10;
+    return `${m}m`;
+  }
+  return `${km.toFixed(1)}km`;
+}
+
+/** 거리 + (driving이면) 차 소요시간 한 줄. straight-line은 "직선거리 약" 라벨. */
+export function formatAnchorDistance(d: AnchorDistance): string {
+  const dist = formatKm(d.km);
+  if (d.source === 'driving') {
+    if (typeof d.durationMin === 'number') return `${dist} · 차 ${d.durationMin}분`;
+    return dist;
+  }
+  return `직선거리 약 ${dist}`;
 }
 
 export function getHouseTitle(house: House): string {

@@ -32,6 +32,7 @@ import { NaverMapMarkerOverlay, NaverMapView, type NaverMapViewRef } from '@mj-s
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
+import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
 import { SAMPLE_HOUSES } from '@/screens/houses/houseSampleData';
 import {
   DEFAULT_MAP_CENTER,
@@ -39,6 +40,7 @@ import {
   filterHousesByRegion,
   formatDepositShort,
   formatHousePrice,
+  getAnchorCoordinate,
   getAverageRating,
   getDealTypeLabel,
   getHouseCoordinate,
@@ -48,8 +50,11 @@ import {
   type MapCoordinate,
   type MapRegion,
 } from '@/screens/houses/houseMapUtils';
+import { ANCHOR_META } from '@/screens/houses/anchorMeta';
+import { AnchorPlacesSheet } from '@/screens/home/components/AnchorPlacesSheet';
+import { AnchorNudge } from '@/screens/home/components/AnchorNudge';
 import { radii, spacing, typography } from '@/theme';
-import { House } from '@/types';
+import { AnchorType, House } from '@/types';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
 type CameraIdleParams = {
@@ -103,6 +108,8 @@ const HOUSE_MARKER_IMAGE = require('../../../assets/map-markers/marker-house.png
 const CLUSTER_MARKER_IMAGE = require('../../../assets/map-markers/marker-cluster.png');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CURRENT_LOCATION_MARKER_IMAGE = require('../../../assets/map-markers/marker-current-location.png');
+
+type AnchorMarker = { anchorType: AnchorType; coordinate: MapCoordinate };
 // Phase 2 스캐폴드: 네이버 커스텀 지도 스타일. 값이 있을 때만 적용한다.
 // customStyleId 는 네이티브에 연결되므로 최초 활성화 시 EAS 재빌드가 한 번 필요하다.
 const NAVER_MAP_STYLE_ID = process.env.EXPO_PUBLIC_NAVER_MAP_STYLE_ID ?? '';
@@ -174,6 +181,18 @@ export function HomeMapScreen({ navigation }: Props) {
   const [sortMode, setSortMode] = useState<HomeSortMode>('RECENT');
   const [sortOpen, setSortOpen] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const { data: anchorPlaces = [] } = useAnchorPlaces();
+  const [anchorSheetOpen, setAnchorSheetOpen] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+
+  const anchorMarkers = useMemo<AnchorMarker[]>(
+    () =>
+      anchorPlaces
+        .map((a) => ({ anchorType: a.anchorType, coordinate: getAnchorCoordinate(a) }))
+        .filter((m): m is AnchorMarker => m.coordinate !== null),
+    [anchorPlaces],
+  );
+  const showAnchorNudge = anchorPlaces.length === 0 && !nudgeDismissed;
 
   const baseVisibleHouses = useMemo(() => {
     const inViewport = filterHousesByRegion(houses, viewportRegion);
@@ -346,6 +365,7 @@ export function HomeMapScreen({ navigation }: Props) {
       >
         <HomeNativeMarkers
           markerItems={markerItems}
+          anchorMarkers={anchorMarkers}
           selectedHouseId={activeHouse?.id ?? null}
           userLocation={userLocation}
           onSelectHouse={handleSelectHouseFromMarker}
@@ -390,6 +410,24 @@ export function HomeMapScreen({ navigation }: Props) {
           >
             <Ionicons name="navigate-outline" size={18} color={homeColors.ink70} />
           </Pressable>
+          <Pressable
+            testID="home-anchor-button"
+            accessibilityRole="button"
+            accessibilityLabel="내 직장·학교 등록"
+            onPress={() => setAnchorSheetOpen(true)}
+            style={styles.mapToolButton}
+          >
+            <Ionicons name="briefcase-outline" size={18} color={homeColors.ink70} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      {viewMode === 'MAP' && showAnchorNudge ? (
+        <View style={[styles.anchorNudgeWrap, { top: insets.top + 64 }]} pointerEvents="box-none">
+          <AnchorNudge
+            onPress={() => setAnchorSheetOpen(true)}
+            onDismiss={() => setNudgeDismissed(true)}
+          />
         </View>
       ) : null}
 
@@ -458,18 +496,22 @@ export function HomeMapScreen({ navigation }: Props) {
           onClose={() => setFilterOpen(false)}
         />
       ) : null}
+
+      {anchorSheetOpen ? <AnchorPlacesSheet onClose={() => setAnchorSheetOpen(false)} /> : null}
     </View>
   );
 }
 
 function HomeNativeMarkers({
   markerItems,
+  anchorMarkers,
   selectedHouseId,
   userLocation,
   onSelectHouse,
   onSelectCluster,
 }: {
   markerItems: HomeMarkerItem[];
+  anchorMarkers: AnchorMarker[];
   selectedHouseId: string | null;
   userLocation: MapCoordinate | null;
   onSelectHouse: (houseId: string) => void;
@@ -477,6 +519,28 @@ function HomeNativeMarkers({
 }) {
   return (
     <>
+      {anchorMarkers.map((anchor) => (
+        <TestableNaverMapMarkerOverlay
+          key={`anchor-${anchor.anchorType}`}
+          testID={`home-anchor-marker-${anchor.anchorType}`}
+          latitude={anchor.coordinate.latitude}
+          longitude={anchor.coordinate.longitude}
+          width={ICON_MARKER_SIZE}
+          height={ICON_MARKER_SIZE}
+          anchor={{ x: 0.5, y: 0.5 }}
+          image={HOUSE_MARKER_IMAGE}
+          isForceShowIcon
+          zIndex={90}
+          caption={{
+            text: `${ANCHOR_META[anchor.anchorType].emoji} ${ANCHOR_META[anchor.anchorType].label}`,
+            align: 'Top',
+            color: homeColors.primary,
+            haloColor: homeColors.white,
+            textSize: 12,
+          }}
+        />
+      ))}
+
       {markerItems.map((item) => {
         if (item.type === 'cluster') {
           return (
@@ -1673,6 +1737,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
     backgroundColor: 'rgba(255,255,255,0.94)',
+  },
+  anchorNudgeWrap: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    zIndex: 28,
+    elevation: 28,
   },
   locationBannerText: {
     ...typography.caption,

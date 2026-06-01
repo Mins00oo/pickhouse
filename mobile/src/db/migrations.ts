@@ -121,4 +121,24 @@ export const migrations: Migration[] = [
       ALTER TABLE houses ADD COLUMN full_option INTEGER;
     `,
   },
+  {
+    // 거점(직장/학교) 고정 슬롯. 로컬 전용 — is_dirty는 미래 서버 동기화 대비.
+    // (user_id, anchor_type) UNIQUE 로 타입별 1개 보장(UPSERT).
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS anchor_places (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        anchor_type TEXT NOT NULL,
+        label TEXT,
+        address_json TEXT NOT NULL,
+        latitude REAL,
+        longitude REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_dirty INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_anchor_user_type ON anchor_places(user_id, anchor_type);
+    `,
+  },
 ];
