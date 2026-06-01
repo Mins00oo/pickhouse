@@ -6,6 +6,14 @@ notifyManager.setNotifyFunction((callback) => {
   act(callback);
 });
 
+// @gorhom/bottom-sheet 가 의존하는 reanimated / gesture-handler 테스트 지원
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('react-native-gesture-handler/jestSetup');
+jest.mock('react-native-reanimated', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('react-native-reanimated/mock'),
+);
+
 jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),
   getItemAsync: jest.fn(),
@@ -67,6 +75,11 @@ jest.mock(
       animateCameraTo: jest.fn(),
       animateRegionTo: jest.fn(),
       cancelAnimation: jest.fn(),
+      coordinateToScreen: jest.fn(async ({ latitude, longitude }: any) => ({
+        isValid: true,
+        screenX: Math.round((longitude - 126.82) * 1500),
+        screenY: Math.round((37.63 - latitude) * 1500),
+      })),
       setLocationTrackingMode: jest.fn(),
     };
     const MockNaverMapView = React.forwardRef(({ children, testID = 'naver-map-view', ...props }: any, ref: any) => {
@@ -83,6 +96,8 @@ jest.mock(
           testID: testID ?? `house-map-marker-${latitude}-${longitude}`,
           onPress: onTap,
           accessibilityLabel: `marker-${latitude}-${longitude}`,
+          latitude,
+          longitude,
           ...props,
         }, children),
     };
@@ -99,5 +114,25 @@ jest.mock('@expo/vector-icons', () => {
   return {
     Ionicons: ({ name, testID }: { name: string; testID?: string }) =>
       React.createElement(Text, { testID }, name),
+  };
+});
+
+jest.mock('react-native-calendars', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Pressable, Text } = require('react-native');
+
+  return {
+    Calendar: ({ onDayPress, testID }: { onDayPress?: (d: { dateString: string }) => void; testID?: string }) =>
+      React.createElement(
+        Pressable,
+        {
+          testID: testID ?? 'mock-calendar',
+          onPress: () => onDayPress && onDayPress({ dateString: '2026-06-15' }),
+        },
+        React.createElement(Text, null, 'calendar'),
+      ),
+    LocaleConfig: { locales: {}, defaultLocale: 'en' },
   };
 });

@@ -1,0 +1,55 @@
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
+index 973d05c..31247ad 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
+@@ -87,12 +87,12 @@ function useAnimatedLayout(containerLayoutState, topInset, bottomInset, modal, s
+   }, [state, verticalInset, modal]);
+   (0, _react.useEffect)(() => {
+     _reactNative.Dimensions.addEventListener('change', ({
+-      window
++      window: win
+     }) => {
+       state.modify(_state => {
+         'worklet';
+ 
+-        _state.window = window;
++        _state.window = win;
+         return _state;
+       });
+     });
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js b/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
+index b0eec93..34828f8 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
+@@ -83,12 +83,12 @@ export function useAnimatedLayout(containerLayoutState, topInset, bottomInset, m
+   }, [state, verticalInset, modal]);
+   useEffect(() => {
+     Dimensions.addEventListener('change', ({
+-      window
++      window: win
+     }) => {
+       state.modify(_state => {
+         'worklet';
+ 
+-        _state.window = window;
++        _state.window = win;
+         return _state;
+       });
+     });
+diff --git a/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts b/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
+index 68c674d..63ec6a3 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
+@@ -106,10 +106,10 @@ export function useAnimatedLayout(
+     [state, verticalInset, modal]
+   );
+   useEffect(() => {
+-    Dimensions.addEventListener('change', ({ window }) => {
++    Dimensions.addEventListener('change', ({ window: win }) => {
+       state.modify(_state => {
+         'worklet';
+-        _state.window = window;
++        _state.window = win;
+         return _state;
+       });
+     });

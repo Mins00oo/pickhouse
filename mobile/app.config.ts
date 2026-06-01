@@ -3,6 +3,9 @@ import { ConfigContext } from 'expo/config';
 const APP_ID = 'com.pickhouse.app';
 const KAKAO_NATIVE_APP_KEY = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ?? '';
 const NAVER_MAP_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID ?? '';
+// 선택값. 네이버 Map Style Editor 에서 만든 커스텀 스타일 ID. 설정 시에만 지도에 적용된다.
+// 최초 활성화는 네이티브 코드에 연결되므로 EAS 재빌드가 한 번 필요하다.
+const NAVER_MAP_STYLE_ID = process.env.EXPO_PUBLIC_NAVER_MAP_STYLE_ID ?? '';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 const IS_EAS_BUILD = process.env.EAS_BUILD === 'true';
 const IS_PRODUCTION_BUILD = process.env.EAS_BUILD_PROFILE === 'production';
@@ -28,6 +31,12 @@ export default ({ config }: ConfigContext) => ({
   orientation: 'portrait',
   scheme: 'pickhouse',
   userInterfaceStyle: 'light',
+  // EAS Update(OTA): 네이티브 버전(appVersion)에 묶인 런타임. 이후 JS-only 수정은
+  // `eas update --branch <channel>` 로 재빌드 없이 배포된다.
+  runtimeVersion: { policy: 'appVersion' },
+  updates: {
+    url: 'https://u.expo.dev/5385220b-1e37-4a99-a2b7-3b24178df31b',
+  },
   icon: './assets/icon.png',
   splash: {
     image: './assets/splash-icon.png',
@@ -109,5 +118,6 @@ export default ({ config }: ConfigContext) => ({
   extra: {
     ...config.extra,
     eas: { projectId: '5385220b-1e37-4a99-a2b7-3b24178df31b' },
+    naverMapStyleId: NAVER_MAP_STYLE_ID,
   },
 });

@@ -16,3 +16,4 @@ android/
 
 # Brainstorming visual companion session files
 .superpowers/
+.claude/

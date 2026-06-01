@@ -76,4 +76,94 @@ describe('housesRepo', () => {
     expect(sql).toMatch(/is_deleted = 1/);
     expect(sql).toMatch(/is_dirty = 1/);
   });
+
+  it('insert persists wizard columns and serializes json/boolean fields', async () => {
+    await housesRepo.insert(
+      {
+        ...sampleHouse,
+        nickname: '청파동 빌라',
+        visitedAt: '2026-05-29',
+        roomType: 'ONE_AND_HALF',
+        floorType: 'GROUND',
+        direction: 'SOUTH',
+        maintenanceIncludes: ['WATER', 'INTERNET'],
+        utilityEstimates: { ELECTRIC: 4, GAS: 3 },
+        fullOption: true,
+      },
+      'u1',
+    );
+    const [sql, ...args] = mockRunAsync.mock.calls[0]!;
+    expect(sql).toMatch(/nickname/);
+    expect(sql).toMatch(/room_type/);
+    expect(sql).toMatch(/floor_type/);
+    expect(sql).toMatch(/maintenance_includes_json/);
+    expect(sql).toMatch(/utility_estimates_json/);
+    expect(sql).toMatch(/full_option/);
+    expect(args).toContain('청파동 빌라');
+    expect(args).toContain(JSON.stringify(['WATER', 'INTERNET']));
+    expect(args).toContain(JSON.stringify({ ELECTRIC: 4, GAS: 3 }));
+    expect(args).toContain(1); // fullOption true -> 1
+  });
+
+  it('insert stores empty utilityEstimates as null (not "{}")', async () => {
+    await housesRepo.insert({ ...sampleHouse, utilityEstimates: {} }, 'u1');
+    const [, ...args] = mockRunAsync.mock.calls[0]!;
+    expect(args).not.toContain('{}');
+  });
+
+  it('findById maps wizard columns back to House', async () => {
+    mockGetFirstAsync.mockResolvedValueOnce({
+      id: 'h1',
+      user_id: 'u1',
+      address_json: JSON.stringify(sampleHouse.address),
+      deal_type: 'WOLSE',
+      deposit: 1000,
+      rent: 50,
+      nickname: '청파동 빌라',
+      visited_at: '2026-05-29',
+      room_type: 'TWO_ROOM',
+      floor_type: 'SEMI_BASEMENT',
+      direction: 'NORTH',
+      maintenance_includes_json: JSON.stringify(['WATER', 'GAS']),
+      utility_estimates_json: JSON.stringify({ ELECTRIC: 5 }),
+      full_option: 1,
+      created_at: sampleHouse.createdAt,
+      updated_at: sampleHouse.updatedAt,
+    });
+    const r = await housesRepo.findById('h1');
+    expect(r?.nickname).toBe('청파동 빌라');
+    expect(r?.visitedAt).toBe('2026-05-29');
+    expect(r?.roomType).toBe('TWO_ROOM');
+    expect(r?.floorType).toBe('SEMI_BASEMENT');
+    expect(r?.direction).toBe('NORTH');
+    expect(r?.maintenanceIncludes).toEqual(['WATER', 'GAS']);
+    expect(r?.utilityEstimates).toEqual({ ELECTRIC: 5 });
+    expect(r?.fullOption).toBe(true);
+  });
+
+  it('findById leaves wizard fields undefined when columns are null', async () => {
+    mockGetFirstAsync.mockResolvedValueOnce({
+      id: 'h1',
+      user_id: 'u1',
+      address_json: JSON.stringify(sampleHouse.address),
+      deal_type: 'WOLSE',
+      deposit: 1000,
+      rent: 50,
+      nickname: null,
+      visited_at: null,
+      room_type: null,
+      floor_type: null,
+      direction: null,
+      maintenance_includes_json: null,
+      utility_estimates_json: null,
+      full_option: null,
+      created_at: sampleHouse.createdAt,
+      updated_at: sampleHouse.updatedAt,
+    });
+    const r = await housesRepo.findById('h1');
+    expect(r?.nickname).toBeUndefined();
+    expect(r?.maintenanceIncludes).toBeUndefined();
+    expect(r?.utilityEstimates).toBeUndefined();
+    expect(r?.fullOption).toBeUndefined();
+  });
 });

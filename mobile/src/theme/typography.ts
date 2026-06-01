@@ -13,4 +13,7 @@ export const typography = {
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   } as TextStyle,
+  // 위저드 폼 라벨 / 금액 표시 (목업 근사 — Pretendard 미로드 시 시스템 폰트 폴백)
+  label: { fontSize: 14, fontWeight: '700', letterSpacing: -0.3 } as TextStyle,
+  amount: { fontSize: 20, fontWeight: '700', letterSpacing: -0.5 } as TextStyle,
 } as const;

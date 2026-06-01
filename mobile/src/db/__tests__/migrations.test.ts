@@ -20,4 +20,22 @@ describe('migrations', () => {
     expect(allSql).toMatch(/CREATE TABLE.*photos/);
     expect(allSql).toMatch(/CREATE TABLE.*sync_queue/);
   });
+
+  it('adds the add-house wizard columns in migration v2', () => {
+    const v2 = migrations.find((m) => m.version === 2);
+    expect(v2).toBeDefined();
+    const sql = v2!.sql;
+    for (const col of [
+      'nickname',
+      'visited_at',
+      'room_type',
+      'floor_type',
+      'direction',
+      'maintenance_includes_json',
+      'utility_estimates_json',
+      'full_option',
+    ]) {
+      expect(sql).toMatch(new RegExp(`ALTER TABLE houses ADD COLUMN ${col}`));
+    }
+  });
 });

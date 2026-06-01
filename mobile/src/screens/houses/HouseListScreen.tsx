@@ -7,14 +7,13 @@ import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
 import { colors, spacing, typography } from '@/theme';
 import { HouseRecordRow } from './components/HouseRecordRow';
-import { getDisplayHouses } from './houseSampleData';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'HouseList'>;
 
 export function HouseListScreen({ navigation }: Props) {
   const { data = [], refetch, isFetching } = useHouses();
   const houses = useMemo(
-    () => [...getDisplayHouses(data)].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    () => [...data].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [data],
   );
 
@@ -40,6 +39,12 @@ export function HouseListScreen({ navigation }: Props) {
         keyExtractor={(house) => house.id}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>아직 기록한 집이 없어요</Text>
+            <Text style={styles.emptyBody}>홈에서 첫 집을 기록하면 보관함에 모아볼 수 있어요.</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <HouseRecordRow
             testID={`house-list-row-${item.id}`}
@@ -85,8 +90,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: {
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingBottom: 120,
     gap: spacing.md,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  emptyTitle: {
+    ...typography.bodyBold,
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    ...typography.caption,
+    marginTop: spacing.sm,
+    color: colors.inkMuted,
+    textAlign: 'center',
   },
 });

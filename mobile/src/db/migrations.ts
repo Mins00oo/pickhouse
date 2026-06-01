@@ -107,4 +107,18 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_sync_queue_entity ON sync_queue(entity, entity_id);
     `,
   },
+  {
+    // 집 추가 위저드 신규 필드. 모두 nullable (기존 행 호환). 컨디션은 기존 컬럼 재사용 — 신설 없음.
+    version: 2,
+    sql: `
+      ALTER TABLE houses ADD COLUMN nickname TEXT;
+      ALTER TABLE houses ADD COLUMN visited_at TEXT;
+      ALTER TABLE houses ADD COLUMN room_type TEXT;
+      ALTER TABLE houses ADD COLUMN floor_type TEXT;
+      ALTER TABLE houses ADD COLUMN direction TEXT;
+      ALTER TABLE houses ADD COLUMN maintenance_includes_json TEXT;
+      ALTER TABLE houses ADD COLUMN utility_estimates_json TEXT;
+      ALTER TABLE houses ADD COLUMN full_option INTEGER;
+    `,
+  },
 ];
