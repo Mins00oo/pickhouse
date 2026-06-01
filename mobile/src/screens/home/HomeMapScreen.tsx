@@ -11,13 +11,13 @@ import {
   useState,
 } from 'react';
 import {
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -90,21 +90,22 @@ const CARD_WIDTH = 320;
 const CARD_GAP = 10;
 const CARD_SNAP_INTERVAL = CARD_WIDTH + CARD_GAP;
 const INDIVIDUAL_MARKER_MIN_ZOOM = 13;
-const SELECTED_MARKER_WIDTH = 116;
-const SELECTED_MARKER_HEIGHT = 50;
+const SELECTED_MARKER_WIDTH = 148;
+const SELECTED_MARKER_HEIGHT = 34;
 const ICON_MARKER_SIZE = 36;
 const CLUSTER_MARKER_SIZE = 40;
 const CURRENT_LOCATION_MARKER_SIZE = 44;
 type TestableMarkerProps = ComponentProps<typeof NaverMapMarkerOverlay> & { testID?: string };
 const TestableNaverMapMarkerOverlay = NaverMapMarkerOverlay as ComponentType<TestableMarkerProps>;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const SELECTED_MARKER_IMAGE = require('../../../assets/map-markers/marker-price-selected.png');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const HOUSE_MARKER_IMAGE = require('../../../assets/map-markers/marker-house.png');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CLUSTER_MARKER_IMAGE = require('../../../assets/map-markers/marker-cluster.png');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CURRENT_LOCATION_MARKER_IMAGE = require('../../../assets/map-markers/marker-current-location.png');
+// Phase 2 스캐폴드: 네이버 커스텀 지도 스타일. 값이 있을 때만 적용한다.
+// customStyleId 는 네이티브에 연결되므로 최초 활성화 시 EAS 재빌드가 한 번 필요하다.
+const NAVER_MAP_STYLE_ID = process.env.EXPO_PUBLIC_NAVER_MAP_STYLE_ID ?? '';
 const SAMPLE_MAP_CENTER = getAverageCoordinate(SAMPLE_HOUSES) ?? DEFAULT_MAP_CENTER;
 const INITIAL_CAMERA = {
   latitude: DEFAULT_MAP_CENTER.latitude,
@@ -121,9 +122,9 @@ const FILTER_SNAP_HEIGHTS: Record<FilterSheetSnap, number> = {
   HALF: 520,
   FULL: 700,
 };
-// gorhom bottom-sheet 스냅 지점(화면 높이 비율). 92% 로 네이버지도처럼 거의 풀스크린까지 확장.
-const SHEET_SNAP_POINTS = ['16%', '46%', '92%'];
-const SHEET_PEEK_RATIO = 0.16;
+// 결과 시트는 드래그 없이 한 장의 카드 + 헤더가 딱 맞게 보이는 고정 높이로 둔다.
+// 실제 높이는 기기 하단 인셋(홈 인디케이터)을 더해 카드가 가리지 않도록 한다.
+const SHEET_BASE_HEIGHT = 242;
 const DEPOSIT_LIMITS: NumericRange = { min: 0, max: 30000 };
 const RENT_LIMITS: NumericRange = { min: 0, max: 150 };
 const DEFAULT_HOME_FILTER: HomeFilterState = {
@@ -155,7 +156,6 @@ const SORT_OPTIONS: { key: HomeSortMode; label: string; testID: string }[] = [
 
 export function HomeMapScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const windowHeight = useWindowDimensions().height;
   const mapRef = useRef<NaverMapViewRef>(null);
   const cameraIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasCenteredOnUser = useRef(false);
@@ -292,9 +292,8 @@ export function HomeMapScreen({ navigation }: Props) {
   };
 
   const handleSelectHouseFromMarker = useCallback((houseId: string) => {
+    // 시트는 고정 높이라 스냅 이동이 필요 없다. 캐러셀이 선택된 카드로 자동 스크롤한다.
     setActiveHouseId(houseId);
-    // 마커를 누르면 시트를 카드가 보이는 중간 단계로 올린다
-    sheetRef.current?.snapToIndex(1);
   }, []);
 
   const toggleHomeViewMode = () => {
@@ -307,7 +306,8 @@ export function HomeMapScreen({ navigation }: Props) {
     sheetRef.current?.snapToIndex(0);
   };
 
-  const peekSheetHeight = Math.round(windowHeight * SHEET_PEEK_RATIO);
+  const sheetFixedHeight = SHEET_BASE_HEIGHT + insets.bottom;
+  const peekSheetHeight = sheetFixedHeight;
   const mapFloatingBottom = peekSheetHeight + 14;
   const listToggleBottom = viewMode === 'MAP' ? peekSheetHeight + 14 : 16 + insets.bottom;
   const logoBottomMargin = Math.max(peekSheetHeight - 4, 0);
@@ -321,6 +321,15 @@ export function HomeMapScreen({ navigation }: Props) {
         initialCamera={isSampleMode ? SAMPLE_INITIAL_CAMERA : INITIAL_CAMERA}
         animationDuration={260}
         mapType="Basic"
+        {...(NAVER_MAP_STYLE_ID
+          ? {
+              customStyleId: NAVER_MAP_STYLE_ID,
+              onCustomStyleLoadFailed: ({ message }: { message: string }) => {
+                // 스타일 로드 실패 시 기본 지도로 자연스럽게 폴백한다.
+                console.warn('Naver custom map style load failed', message);
+              },
+            }
+          : null)}
         lightness={0.06}
         symbolScale={0.86}
         buildingHeight={0.35}
@@ -331,6 +340,7 @@ export function HomeMapScreen({ navigation }: Props) {
         logoAlign="BottomLeft"
         logoMargin={{ bottom: logoBottomMargin, left: 14 }}
         locale="ko"
+        onTapMap={() => Keyboard.dismiss()}
         onCameraChanged={handleCameraChanged}
         onCameraIdle={handleCameraIdle}
       >
@@ -401,6 +411,8 @@ export function HomeMapScreen({ navigation }: Props) {
           sortMode={sortMode}
           sortOpen={sortOpen}
           sheetRef={sheetRef}
+          sheetHeight={sheetFixedHeight}
+          bottomInset={insets.bottom}
           onSelectHouse={setActiveHouseId}
           onOpenHouse={openHouseDetail}
           onCreateHouse={openHouseInput}
@@ -493,20 +505,50 @@ function HomeNativeMarkers({
         }
 
         const selected = item.house.id === selectedHouseId;
+        if (selected) {
+          // 선택된 집은 가격 말풍선으로 표시한다.
+          // iOS New Arch 에서 커스텀 뷰 children 은 마운트 직후 layer 스냅샷으로 캡처되는데,
+          // 배경/테두리(레이어 속성)는 캡처되지만 UILabel·폰트 글리프(텍스트)는 비동기 레이아웃이라
+          // 캡처에서 누락된다. 따라서 알약 "배경"만 children 으로 그리고, "텍스트"는 네이티브
+          // caption(클러스터 카운트와 동일한 채널, 항상 렌더됨)으로 알약 중앙에 얹는다.
+          const markerLabel = `${getMarkerDealTypeLabel(item.house)} ${formatMarkerPrice(item.house)}`;
+          return (
+            <TestableNaverMapMarkerOverlay
+              key={item.house.id}
+              testID={`home-house-marker-${item.house.id}`}
+              latitude={item.coordinate.latitude}
+              longitude={item.coordinate.longitude}
+              width={SELECTED_MARKER_WIDTH}
+              height={SELECTED_MARKER_HEIGHT}
+              anchor={{ x: 0.5, y: 1 }}
+              isForceShowIcon
+              zIndex={120}
+              caption={{
+                text: markerLabel,
+                align: 'Center',
+                color: homeColors.ink,
+                haloColor: 'transparent',
+                textSize: 12,
+                requestedWidth: 0,
+              }}
+              onTap={() => onSelectHouse(item.house.id)}
+            >
+              <SelectedHouseMarker house={item.house} />
+            </TestableNaverMapMarkerOverlay>
+          );
+        }
         return (
           <TestableNaverMapMarkerOverlay
             key={item.house.id}
             testID={`home-house-marker-${item.house.id}`}
             latitude={item.coordinate.latitude}
             longitude={item.coordinate.longitude}
-            width={selected ? SELECTED_MARKER_WIDTH : ICON_MARKER_SIZE}
-            height={selected ? SELECTED_MARKER_HEIGHT : ICON_MARKER_SIZE}
-            anchor={{ x: 0.5, y: selected ? 0.9 : 0.5 }}
-            image={selected ? SELECTED_MARKER_IMAGE : HOUSE_MARKER_IMAGE}
+            width={ICON_MARKER_SIZE}
+            height={ICON_MARKER_SIZE}
+            anchor={{ x: 0.5, y: 0.5 }}
+            image={HOUSE_MARKER_IMAGE}
             isForceShowIcon
-            zIndex={selected ? 120 : 60}
-            caption={selected ? getSelectedMarkerCaption(item.house) : undefined}
-            subCaption={selected ? getSelectedMarkerSubCaption(item.house) : undefined}
+            zIndex={60}
             onTap={() => onSelectHouse(item.house.id)}
           />
         );
@@ -582,6 +624,8 @@ function HomeCarousel({
   sortMode,
   sortOpen,
   sheetRef,
+  sheetHeight,
+  bottomInset,
   onSelectHouse,
   onOpenHouse,
   onCreateHouse,
@@ -594,6 +638,8 @@ function HomeCarousel({
   sortMode: HomeSortMode;
   sortOpen: boolean;
   sheetRef: RefObject<ComponentRef<typeof BottomSheet>>;
+  sheetHeight: number;
+  bottomInset: number;
   onSelectHouse: (houseId: string) => void;
   onOpenHouse: (houseId: string) => void;
   onCreateHouse: () => void;
@@ -601,7 +647,7 @@ function HomeCarousel({
   onSortChange: (sortMode: HomeSortMode) => void;
 }) {
   const carouselRef = useRef<ScrollView>(null);
-  const snapPoints = useMemo(() => SHEET_SNAP_POINTS, []);
+  const snapPoints = useMemo(() => [sheetHeight], [sheetHeight]);
   const activeIndex = Math.max(
     0,
     houses.findIndex((house) => house.id === selectedHouseId),
@@ -629,11 +675,11 @@ function HomeCarousel({
       index={0}
       snapPoints={snapPoints}
       enableDynamicSizing={false}
-      handleComponent={() => (
-        <View style={styles.sheetHandleWrap}>
-          <View style={styles.sheetHandle} />
-        </View>
-      )}
+      enablePanDownToClose={false}
+      enableHandlePanningGesture={false}
+      enableContentPanningGesture={false}
+      enableOverDrag={false}
+      handleComponent={null}
       backgroundStyle={styles.sheetBackground}
       style={styles.sheetShadow}
     >
@@ -682,8 +728,9 @@ function HomeCarousel({
             showsHorizontalScrollIndicator={false}
             snapToInterval={CARD_SNAP_INTERVAL}
             decelerationRate="fast"
+            keyboardShouldPersistTaps="handled"
             onMomentumScrollEnd={handleMomentumScrollEnd}
-            contentContainerStyle={styles.cardScroller}
+            contentContainerStyle={[styles.cardScroller, { paddingBottom: bottomInset + spacing.sm }]}
           >
             {houses.map((house) => (
               <HomeHouseCard
@@ -797,7 +844,12 @@ function HomeFullListMode({
       </View>
 
       {houses.length > 0 ? (
-        <ScrollView testID="home-full-list" style={styles.fullListBody} contentContainerStyle={styles.fullListContent}>
+        <ScrollView
+          testID="home-full-list"
+          style={styles.fullListBody}
+          contentContainerStyle={styles.fullListContent}
+          keyboardShouldPersistTaps="handled"
+        >
           {houses.map((house) => (
             <HomeFullListRow
               key={house.id}
@@ -1348,26 +1400,19 @@ function getClusterCellSize(zoomLevel: number): number {
   return 0.02;
 }
 
-function getSelectedMarkerCaption(house: House) {
-  return {
-    text: getMarkerDealTypeLabel(house),
-    align: 'Center' as const,
-    color: homeColors.white,
-    haloColor: 'transparent',
-    textSize: 10,
-    requestedWidth: SELECTED_MARKER_WIDTH,
-    offset: -8,
-  };
-}
-
-function getSelectedMarkerSubCaption(house: House) {
-  return {
-    text: formatMarkerPrice(house),
-    color: homeColors.white,
-    haloColor: 'transparent',
-    textSize: 14,
-    requestedWidth: SELECTED_MARKER_WIDTH,
-  };
+function SelectedHouseMarker({ house }: { house: House }) {
+  const dealLabel = getMarkerDealTypeLabel(house);
+  const priceText = formatMarkerPrice(house);
+  return (
+    // children 에는 "배경(흰 알약 + 코랄 테두리)"만 둔다. 텍스트는 네이티브 caption 으로 그린다.
+    // (iOS New Arch 의 children 캡처는 레이어 배경/테두리만 안정적으로 잡고 텍스트는 누락하기 때문)
+    // key 에 모양 의존성을 담아 가격이 바뀌면 캡처가 갱신되도록 한다(라이브러리 권장).
+    <View
+      key={`${dealLabel}/${priceText}/${SELECTED_MARKER_WIDTH}x${SELECTED_MARKER_HEIGHT}`}
+      collapsable={false}
+      style={styles.selectedPriceMarkerPill}
+    />
+  );
 }
 
 function getMarkerDealTypeLabel(house: House): string {
@@ -1718,55 +1763,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 8,
   },
-  priceMarkerShell: {
+  selectedPriceMarkerPill: {
     width: SELECTED_MARKER_WIDTH,
     height: SELECTED_MARKER_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    overflow: 'visible',
-  },
-  selectedPriceMarkerPill: {
-    width: '100%',
-    height: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderRadius: 16,
-    backgroundColor: homeColors.coral,
+    borderRadius: SELECTED_MARKER_HEIGHT / 2,
+    backgroundColor: homeColors.white,
     borderColor: homeColors.coral,
     borderWidth: 1.5,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
+    shadowColor: '#0E1A14',
+    shadowOpacity: 0.2,
+    shadowRadius: 7,
     shadowOffset: { width: 0, height: 3 },
-    elevation: 7,
-  },
-  priceMarkerDealText: {
-    color: homeColors.white,
-    fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 12,
-    includeFontPadding: false,
-    textAlign: 'center',
-  },
-  priceMarkerText: {
-    color: homeColors.white,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 15,
-    includeFontPadding: false,
-    textAlign: 'center',
-  },
-  selectedPriceMarkerTail: {
-    width: 8,
-    height: 8,
-    marginTop: -5,
-    backgroundColor: homeColors.coral,
-    borderRightWidth: 1.5,
-    borderBottomWidth: 1.5,
-    borderColor: homeColors.coral,
-    transform: [{ rotate: '45deg' }],
+    elevation: 8,
   },
   iconMarker: {
     width: ICON_MARKER_SIZE,
@@ -1866,11 +1874,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
   },
-  sheetHandleWrap: {
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    backgroundColor: 'transparent',
-  },
   sheetBody: {
     flex: 1,
   },
@@ -1879,6 +1882,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.sm,
   },
   sheetTitleGroup: {
@@ -1911,7 +1915,7 @@ const styles = StyleSheet.create({
   },
   sortMenu: {
     position: 'absolute',
-    top: 49,
+    top: 61,
     right: spacing.lg,
     zIndex: 5,
     width: 118,
@@ -1953,15 +1957,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: homeColors.borderSoft,
     backgroundColor: homeColors.white,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowColor: '#0E1A14',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   resultList: {
     flex: 1,

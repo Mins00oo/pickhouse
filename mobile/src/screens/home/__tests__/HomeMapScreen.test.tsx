@@ -277,30 +277,30 @@ describe('HomeMapScreen', () => {
     expect(getByTestId('house-map-view').props.locationOverlay).toBeUndefined();
   });
 
-  it('renders native markers with a two-line selected price label and icon-only markers for the rest', async () => {
+  it('renders the selected marker as a custom price balloon and icon-only markers for the rest', async () => {
     const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
     await findByText('망원 소형집');
 
     await waitFor(() => expect(getByTestId('home-house-marker-near')).toBeTruthy());
     expect(queryByTestId('home-map-overlay-layer')).toBeNull();
-    expect(getByTestId('home-house-marker-near')).toBeTruthy();
     expect(getByTestId('home-house-marker-near').props.latitude).toBe(37.556);
     expect(getByTestId('home-house-marker-near').props.longitude).toBe(126.901);
-    expect(getByTestId('home-house-marker-near').props.width).toBe(116);
-    expect(getByTestId('home-house-marker-near').props.height).toBe(50);
+    expect(getByTestId('home-house-marker-near').props.width).toBe(148);
+    expect(getByTestId('home-house-marker-near').props.height).toBe(34);
+    // 선택 마커: 알약 배경은 커스텀 RN 뷰, 가격 텍스트는 네이티브 caption(중앙 정렬)으로 그린다.
     expect(getByTestId('home-house-marker-near').props.caption).toEqual(
-      expect.objectContaining({ text: '월세', align: 'Center', color: '#FFFFFF', offset: -8, requestedWidth: 116 }),
+      expect.objectContaining({ text: expect.stringContaining('1,000 / 50'), align: 'Center' }),
     );
-    expect(getByTestId('home-house-marker-near').props.subCaption).toEqual(
-      expect.objectContaining({ text: '1,000 / 50', color: '#FFFFFF', requestedWidth: 116 }),
-    );
+    expect(getByTestId('home-house-marker-near').props.subCaption).toBeUndefined();
+    expect(queryByTestId('home-house-marker-price-near')).toBeNull();
+
     expect(getByTestId('home-house-marker-outside')).toBeTruthy();
     expect(getByTestId('home-house-marker-outside').props.width).toBe(36);
     expect(getByTestId('home-house-marker-outside').props.height).toBe(36);
     expect(getByTestId('home-house-marker-outside').props.caption).toBeUndefined();
     expect(getByTestId('home-house-marker-outside').props.subCaption).toBeUndefined();
-    expect(queryByTestId('home-selected-marker-outside')).toBeNull();
+    expect(queryByTestId('home-house-marker-price-outside')).toBeNull();
   });
 
   it('keeps house markers attached to native coordinates without screen projection', async () => {
