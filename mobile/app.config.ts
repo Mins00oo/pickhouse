@@ -28,6 +28,12 @@ export default ({ config }: ConfigContext) => ({
   orientation: 'portrait',
   scheme: 'pickhouse',
   userInterfaceStyle: 'light',
+  // EAS Update(OTA): 네이티브 버전(appVersion)에 묶인 런타임. 이후 JS-only 수정은
+  // `eas update --branch <channel>` 로 재빌드 없이 배포된다.
+  runtimeVersion: { policy: 'appVersion' },
+  updates: {
+    url: 'https://u.expo.dev/5385220b-1e37-4a99-a2b7-3b24178df31b',
+  },
   icon: './assets/icon.png',
   splash: {
     image: './assets/splash-icon.png',
