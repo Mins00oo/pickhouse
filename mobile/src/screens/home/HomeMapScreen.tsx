@@ -1,7 +1,9 @@
 import {
   type ComponentProps,
+  type ComponentRef,
   type ComponentType,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -15,25 +17,22 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   View,
 } from 'react-native';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NavigationProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import {
-  NaverMapMarkerOverlay,
-  type NaverMapMarkerOverlayProps,
-  NaverMapView,
-  type NaverMapViewRef,
-} from '@mj-studio/react-native-naver-map';
+import { NaverMapMarkerOverlay, NaverMapView, type NaverMapViewRef } from '@mj-studio/react-native-naver-map';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
-import { getDisplayHouses } from '@/screens/houses/houseSampleData';
+import { SAMPLE_HOUSES } from '@/screens/houses/houseSampleData';
 import {
   DEFAULT_MAP_CENTER,
   filterHousesByKeyword,
@@ -53,7 +52,6 @@ import { radii, spacing, typography } from '@/theme';
 import { House } from '@/types';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type CameraIdleParams = {
   latitude: number;
   longitude: number;
@@ -61,11 +59,23 @@ type CameraIdleParams = {
   region: MapRegion;
 };
 
-type TestableMarkerProps = NaverMapMarkerOverlayProps & { testID?: string };
 type DealFilter = 'ALL' | 'WOLSE' | 'JEONSE';
 type AreaBucket = 'UP_TO_5' | 'UP_TO_10' | 'UP_TO_15' | 'UP_TO_20' | 'OVER_20';
 type RoomBucket = 'STUDIO' | 'ONE_HALF' | 'TWO' | 'THREE_PLUS';
 type NumericRange = { min: number; max: number };
+type HomeViewMode = 'MAP' | 'LIST';
+type HomeSortMode = 'RECENT' | 'DISTANCE' | 'PRICE_ASC' | 'RATING_DESC';
+type FilterSheetSnap = 'PEEK' | 'HALF' | 'FULL';
+type HomeMarkerItem =
+  | { type: 'house'; house: House; coordinate: MapCoordinate }
+  | {
+      type: 'cluster';
+      id: string;
+      coordinate: MapCoordinate;
+      count: number;
+      houseIds: string[];
+      representativeHouseId: string;
+    };
 type HomeFilterState = {
   dealType: DealFilter;
   deposit: NumericRange;
@@ -74,17 +84,46 @@ type HomeFilterState = {
   roomBuckets: RoomBucket[];
 };
 
-const TestableMarker = NaverMapMarkerOverlay as ComponentType<TestableMarkerProps>;
 const CAMERA_IDLE_DEBOUNCE_MS = 1200;
 const MAP_INITIAL_ZOOM = 14;
 const CARD_WIDTH = 320;
 const CARD_GAP = 10;
 const CARD_SNAP_INTERVAL = CARD_WIDTH + CARD_GAP;
+const INDIVIDUAL_MARKER_MIN_ZOOM = 13;
+const SELECTED_MARKER_WIDTH = 116;
+const SELECTED_MARKER_HEIGHT = 50;
+const ICON_MARKER_SIZE = 36;
+const CLUSTER_MARKER_SIZE = 40;
+const CURRENT_LOCATION_MARKER_SIZE = 44;
+type TestableMarkerProps = ComponentProps<typeof NaverMapMarkerOverlay> & { testID?: string };
+const TestableNaverMapMarkerOverlay = NaverMapMarkerOverlay as ComponentType<TestableMarkerProps>;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const SELECTED_MARKER_IMAGE = require('../../../assets/map-markers/marker-price-selected.png');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const HOUSE_MARKER_IMAGE = require('../../../assets/map-markers/marker-house.png');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const CLUSTER_MARKER_IMAGE = require('../../../assets/map-markers/marker-cluster.png');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const CURRENT_LOCATION_MARKER_IMAGE = require('../../../assets/map-markers/marker-current-location.png');
+const SAMPLE_MAP_CENTER = getAverageCoordinate(SAMPLE_HOUSES) ?? DEFAULT_MAP_CENTER;
 const INITIAL_CAMERA = {
   latitude: DEFAULT_MAP_CENTER.latitude,
   longitude: DEFAULT_MAP_CENTER.longitude,
   zoom: MAP_INITIAL_ZOOM,
 };
+const SAMPLE_INITIAL_CAMERA = {
+  latitude: SAMPLE_MAP_CENTER.latitude,
+  longitude: SAMPLE_MAP_CENTER.longitude,
+  zoom: MAP_INITIAL_ZOOM,
+};
+const FILTER_SNAP_HEIGHTS: Record<FilterSheetSnap, number> = {
+  PEEK: 320,
+  HALF: 520,
+  FULL: 700,
+};
+// gorhom bottom-sheet 스냅 지점(화면 높이 비율). 92% 로 네이버지도처럼 거의 풀스크린까지 확장.
+const SHEET_SNAP_POINTS = ['16%', '46%', '92%'];
+const SHEET_PEEK_RATIO = 0.16;
 const DEPOSIT_LIMITS: NumericRange = { min: 0, max: 30000 };
 const RENT_LIMITS: NumericRange = { min: 0, max: 150 };
 const DEFAULT_HOME_FILTER: HomeFilterState = {
@@ -107,14 +146,22 @@ const ROOM_OPTIONS: { key: RoomBucket; label: string; testID: string }[] = [
   { key: 'TWO', label: '투룸', testID: 'filter-room-two' },
   { key: 'THREE_PLUS', label: '쓰리룸+', testID: 'filter-room-three-plus' },
 ];
+const SORT_OPTIONS: { key: HomeSortMode; label: string; testID: string }[] = [
+  { key: 'RECENT', label: '최근 본 순', testID: 'home-sort-recent' },
+  { key: 'DISTANCE', label: '가까운 순', testID: 'home-sort-distance' },
+  { key: 'PRICE_ASC', label: '가격 낮은 순', testID: 'home-sort-price-asc' },
+  { key: 'RATING_DESC', label: '평점 높은 순', testID: 'home-sort-rating' },
+];
 
 export function HomeMapScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const windowHeight = useWindowDimensions().height;
   const mapRef = useRef<NaverMapViewRef>(null);
   const cameraIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasCenteredOnUser = useRef(false);
   const { data = [] } = useHouses();
-  const houses = useMemo(() => getDisplayHouses(data), [data]);
+  const isSampleMode = data.length === 0;
+  const houses = isSampleMode ? SAMPLE_HOUSES : data;
   const [query, setQuery] = useState('');
   const [activeHouseId, setActiveHouseId] = useState<string | null>(null);
   const [viewportRegion, setViewportRegion] = useState<MapRegion | null>(null);
@@ -122,6 +169,10 @@ export function HomeMapScreen({ navigation }: Props) {
   const [userLocation, setUserLocation] = useState<MapCoordinate | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [homeFilter, setHomeFilter] = useState<HomeFilterState>(DEFAULT_HOME_FILTER);
+  const [viewMode, setViewMode] = useState<HomeViewMode>('MAP');
+  const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
+  const [sortMode, setSortMode] = useState<HomeSortMode>('RECENT');
+  const [sortOpen, setSortOpen] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
   const baseVisibleHouses = useMemo(() => {
@@ -130,8 +181,8 @@ export function HomeMapScreen({ navigation }: Props) {
   }, [houses, query, viewportRegion]);
 
   const visibleHouses = useMemo(
-    () => filterHousesByHomeFilter(baseVisibleHouses, homeFilter),
-    [baseVisibleHouses, homeFilter],
+    () => sortHomeHouses(filterHousesByHomeFilter(baseVisibleHouses, homeFilter), sortMode, userLocation),
+    [baseVisibleHouses, homeFilter, sortMode, userLocation],
   );
 
   const activeHouse = useMemo(() => {
@@ -140,6 +191,11 @@ export function HomeMapScreen({ navigation }: Props) {
   }, [activeHouseId, visibleHouses]);
 
   const activeFilterCount = useMemo(() => countActiveFilters(homeFilter), [homeFilter]);
+
+  const markerItems = useMemo(
+    () => buildHomeMarkerItems(visibleHouses, activeHouse?.id ?? null, mapZoomLevel),
+    [activeHouse?.id, mapZoomLevel, visibleHouses],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -161,15 +217,6 @@ export function HomeMapScreen({ navigation }: Props) {
         };
         setUserLocation(coordinate);
         setLocationMessage(null);
-        if (!hasCenteredOnUser.current) {
-          hasCenteredOnUser.current = true;
-          mapRef.current?.animateCameraTo({
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude,
-            zoom: 15,
-            duration: 500,
-          });
-        }
       } catch {
         if (mounted) setLocationMessage('현재 위치를 불러오지 못했어요');
       }
@@ -183,12 +230,27 @@ export function HomeMapScreen({ navigation }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    if (isSampleMode || !userLocation || hasCenteredOnUser.current) return;
+    hasCenteredOnUser.current = true;
+    mapRef.current?.animateCameraTo({
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      zoom: 15,
+      duration: 500,
+    });
+  }, [isSampleMode, userLocation]);
+
   const handleCameraIdle = useCallback((params: CameraIdleParams) => {
     setMapZoomLevel((current) => params.zoom ?? current);
     if (cameraIdleTimer.current) clearTimeout(cameraIdleTimer.current);
     cameraIdleTimer.current = setTimeout(() => {
       setViewportRegion(params.region);
     }, CAMERA_IDLE_DEBOUNCE_MS);
+  }, []);
+
+  const handleCameraChanged = useCallback((params: CameraIdleParams) => {
+    setMapZoomLevel((current) => params.zoom ?? current);
   }, []);
 
   const handleCurrentLocationPress = () => {
@@ -205,6 +267,16 @@ export function HomeMapScreen({ navigation }: Props) {
     });
   };
 
+  const handleClusterPress = (cluster: Extract<HomeMarkerItem, { type: 'cluster' }>) => {
+    setActiveHouseId(cluster.representativeHouseId);
+    mapRef.current?.animateCameraTo({
+      latitude: cluster.coordinate.latitude,
+      longitude: cluster.coordinate.longitude,
+      zoom: Math.max(mapZoomLevel + 2, INDIVIDUAL_MARKER_MIN_ZOOM),
+      duration: 320,
+    });
+  };
+
   const openHouseDetail = (houseId: string) => {
     const rootNavigation =
       navigation.getParent<NavigationProp<HouseStackParamList>>() ??
@@ -212,112 +284,156 @@ export function HomeMapScreen({ navigation }: Props) {
     rootNavigation.navigate('HouseDetail', { houseId });
   };
 
+  const openHouseInput = () => {
+    const rootNavigation =
+      navigation.getParent<NavigationProp<HouseStackParamList>>() ??
+      (navigation as unknown as NavigationProp<HouseStackParamList>);
+    rootNavigation.navigate('HouseInput', undefined);
+  };
+
+  const handleSelectHouseFromMarker = useCallback((houseId: string) => {
+    setActiveHouseId(houseId);
+    // 마커를 누르면 시트를 카드가 보이는 중간 단계로 올린다
+    sheetRef.current?.snapToIndex(1);
+  }, []);
+
+  const toggleHomeViewMode = () => {
+    if (viewMode === 'MAP') {
+      setViewMode('LIST');
+      return;
+    }
+
+    setViewMode('MAP');
+    sheetRef.current?.snapToIndex(0);
+  };
+
+  const peekSheetHeight = Math.round(windowHeight * SHEET_PEEK_RATIO);
+  const mapFloatingBottom = peekSheetHeight + 14;
+  const listToggleBottom = viewMode === 'MAP' ? peekSheetHeight + 14 : 16 + insets.bottom;
+  const logoBottomMargin = Math.max(peekSheetHeight - 4, 0);
+
   return (
     <View style={styles.root}>
       <NaverMapView
         ref={mapRef}
         testID="house-map-view"
         style={StyleSheet.absoluteFill}
-        initialCamera={INITIAL_CAMERA}
+        initialCamera={isSampleMode ? SAMPLE_INITIAL_CAMERA : INITIAL_CAMERA}
         animationDuration={260}
+        mapType="Basic"
+        lightness={0.06}
+        symbolScale={0.86}
+        buildingHeight={0.35}
         isShowCompass={false}
         isShowLocationButton={false}
         isShowScaleBar={false}
         isShowZoomControls={false}
         logoAlign="BottomLeft"
-        logoMargin={{ bottom: 282, left: 14 }}
+        logoMargin={{ bottom: logoBottomMargin, left: 14 }}
         locale="ko"
+        onCameraChanged={handleCameraChanged}
         onCameraIdle={handleCameraIdle}
-        locationOverlay={
-          userLocation
-            ? {
-                isVisible: true,
-                position: userLocation,
-                circleColor: 'rgba(28, 127, 231, 0.22)',
-                circleOutlineColor: 'rgba(28, 127, 231, 0.28)',
-                circleOutlineWidth: 1,
-                circleRadius: 28,
-              }
-            : undefined
-        }
       >
-        <HomeMarkers
-          houses={visibleHouses}
+        <HomeNativeMarkers
+          markerItems={markerItems}
           selectedHouseId={activeHouse?.id ?? null}
-          zoomLevel={mapZoomLevel}
-          onSelectHouse={setActiveHouseId}
+          userLocation={userLocation}
+          onSelectHouse={handleSelectHouseFromMarker}
+          onSelectCluster={handleClusterPress}
         />
       </NaverMapView>
 
-      <View pointerEvents="box-none" style={[styles.topOverlay, { top: insets.top + 8 }]}>
-        <View testID="home-top-bar" style={styles.topBar}>
-          <View style={styles.searchPill}>
-            <Ionicons name="menu-outline" size={20} color={homeColors.ink70} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="장소, 지명, 집 이름 검색"
-              placeholderTextColor={homeColors.ink70}
-              autoCorrect={false}
-              returnKeyType="search"
-              style={styles.searchInput}
-            />
-            <View style={styles.searchButton}>
-              <Ionicons name="search" size={17} color={homeColors.white} />
-            </View>
-          </View>
-
-          <Pressable
-            testID="home-filter-button"
-            accessibilityRole="button"
-            accessibilityLabel="필터"
-            onPress={() => setFilterOpen(true)}
-            style={styles.filterButton}
-          >
-            <Ionicons name="options-outline" size={21} color={homeColors.white} />
-            {activeFilterCount > 0 ? (
-              <View testID="home-filter-badge" style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-              </View>
-            ) : null}
-          </Pressable>
+      {viewMode === 'MAP' ? (
+        <View testID="home-top-overlay" pointerEvents="box-none" style={[styles.topOverlay, { top: insets.top + 5 }]}>
+          <HomeSearchFilterBar
+            query={query}
+            activeFilterCount={activeFilterCount}
+            onQueryChange={setQuery}
+            onFilterPress={() => setFilterOpen(true)}
+          />
         </View>
-      </View>
+      ) : null}
 
-      {locationMessage ? (
+      {viewMode === 'MAP' && locationMessage ? (
         <View style={[styles.locationBanner, { top: insets.top + 64 }]}>
           <Text style={styles.locationBannerText}>{locationMessage}</Text>
         </View>
       ) : null}
 
-      <View pointerEvents="box-none" style={styles.mapTools}>
-        <MapTool icon="layers-outline" label="지도 레이어" />
-        <Pressable
-          testID="home-current-location-button"
-          accessibilityRole="button"
-          accessibilityLabel="현재 위치로 이동"
-          onPress={handleCurrentLocationPress}
-          style={styles.mapToolButton}
-        >
-          <Ionicons name="navigate-outline" size={18} color={homeColors.ink70} />
-        </Pressable>
-      </View>
+      {viewMode === 'MAP' ? (
+        <View pointerEvents="box-none" style={[styles.mapTools, { bottom: mapFloatingBottom }]}>
+          <Pressable
+            testID="home-add-house-button"
+            accessibilityRole="button"
+            accessibilityLabel="집 기록 추가"
+            onPress={openHouseInput}
+            style={[styles.mapToolButton, styles.addHouseButton]}
+          >
+            <Ionicons name="add" size={25} color={homeColors.white} />
+          </Pressable>
+          <Pressable
+            testID="home-current-location-button"
+            accessibilityRole="button"
+            accessibilityLabel="현재 위치로 이동"
+            onPress={handleCurrentLocationPress}
+            style={styles.mapToolButton}
+          >
+            <Ionicons name="navigate-outline" size={18} color={homeColors.ink70} />
+          </Pressable>
+        </View>
+      ) : null}
 
       <Pressable
+        testID="home-list-toggle"
         accessibilityRole="button"
-        onPress={() => navigation.navigate('HouseList')}
-        style={styles.listToggle}
+        onPress={toggleHomeViewMode}
+        style={[styles.listToggle, viewMode === 'LIST' && styles.listToggleOnList, { bottom: listToggleBottom }]}
       >
-        <Ionicons name="list" size={15} color={homeColors.white} />
-        <Text style={styles.listToggleText}>목록 보기</Text>
+        <Ionicons name={viewMode === 'MAP' ? 'list' : 'map-outline'} size={16} color={homeColors.ink} />
+        <Text style={styles.listToggleText}>{viewMode === 'MAP' ? '목록' : '지도'}</Text>
       </Pressable>
 
-      <HomeCarousel
-        houses={visibleHouses}
-        selectedHouseId={activeHouse?.id ?? null}
-        onSelectHouse={setActiveHouseId}
-        onOpenHouse={openHouseDetail}
-      />
+      {viewMode === 'MAP' ? (
+        <HomeCarousel
+          houses={visibleHouses}
+          hasAnyHouses={houses.length > 0}
+          selectedHouseId={activeHouse?.id ?? null}
+          sortMode={sortMode}
+          sortOpen={sortOpen}
+          sheetRef={sheetRef}
+          onSelectHouse={setActiveHouseId}
+          onOpenHouse={openHouseDetail}
+          onCreateHouse={openHouseInput}
+          onSortOpenChange={setSortOpen}
+          onSortChange={(nextSortMode) => {
+            setSortMode(nextSortMode);
+            setSortOpen(false);
+          }}
+        />
+      ) : null}
+
+      {viewMode === 'LIST' ? (
+        <HomeFullListMode
+          houses={visibleHouses}
+          hasAnyHouses={houses.length > 0}
+          selectedHouseId={activeHouse?.id ?? null}
+          query={query}
+          activeFilterCount={activeFilterCount}
+          sortMode={sortMode}
+          sortOpen={sortOpen}
+          topInset={insets.top}
+          onQueryChange={setQuery}
+          onFilterPress={() => setFilterOpen(true)}
+          onSelectHouse={setActiveHouseId}
+          onOpenHouse={openHouseDetail}
+          onCreateHouse={openHouseInput}
+          onSortOpenChange={setSortOpen}
+          onSortChange={(nextSortMode) => {
+            setSortMode(nextSortMode);
+            setSortOpen(false);
+          }}
+        />
+      ) : null}
 
       {filterOpen ? (
         <FilterSheet
@@ -334,116 +450,158 @@ export function HomeMapScreen({ navigation }: Props) {
   );
 }
 
-function HomeMarkers({
-  houses,
+function HomeNativeMarkers({
+  markerItems,
   selectedHouseId,
-  zoomLevel,
+  userLocation,
   onSelectHouse,
+  onSelectCluster,
 }: {
-  houses: House[];
+  markerItems: HomeMarkerItem[];
   selectedHouseId: string | null;
-  zoomLevel: number;
+  userLocation: MapCoordinate | null;
   onSelectHouse: (houseId: string) => void;
+  onSelectCluster: (cluster: Extract<HomeMarkerItem, { type: 'cluster' }>) => void;
 }) {
-  if (zoomLevel <= 12) {
-    const clusterHouses = houses.slice(0, 4);
-    if (clusterHouses.length === 0) return null;
-    const firstHouse = clusterHouses[0];
-    if (!firstHouse) return null;
-    const firstCoordinate = getHouseCoordinate(firstHouse);
-    if (!firstCoordinate) return null;
-
-    return (
-      <TestableMarker
-        testID="home-house-cluster"
-        latitude={firstCoordinate.latitude}
-        longitude={firstCoordinate.longitude}
-        width={56}
-        height={56}
-      >
-        <View style={styles.clusterMarker}>
-          <Text style={styles.clusterCount}>{clusterHouses.length}</Text>
-          <Text style={styles.clusterLabel}>매물</Text>
-        </View>
-      </TestableMarker>
-    );
-  }
-
   return (
     <>
-      {houses.map((house) => {
-        const coordinate = getHouseCoordinate(house);
-        if (!coordinate) return null;
+      {markerItems.map((item) => {
+        if (item.type === 'cluster') {
+          return (
+            <TestableNaverMapMarkerOverlay
+              key={item.id}
+              testID={`home-house-cluster-${item.id}`}
+              latitude={item.coordinate.latitude}
+              longitude={item.coordinate.longitude}
+              width={CLUSTER_MARKER_SIZE}
+              height={CLUSTER_MARKER_SIZE}
+              anchor={{ x: 0.5, y: 0.5 }}
+              image={CLUSTER_MARKER_IMAGE}
+              isForceShowIcon
+              zIndex={80}
+              caption={{
+                text: String(item.count),
+                align: 'Center',
+                color: homeColors.primary,
+                haloColor: 'transparent',
+                textSize: 15,
+                requestedWidth: CLUSTER_MARKER_SIZE,
+              }}
+              onTap={() => onSelectCluster(item)}
+            />
+          );
+        }
 
-        const selected = house.id === selectedHouseId;
-        const markerWidth = selected ? 92 : 84;
-        const markerHeight = 42;
-
+        const selected = item.house.id === selectedHouseId;
         return (
-          <TestableMarker
-            key={house.id}
-            testID={`home-house-marker-${house.id}`}
-            latitude={coordinate.latitude}
-            longitude={coordinate.longitude}
-            width={markerWidth}
-            height={markerHeight}
-            caption={{
-              text: formatMarkerCaption(house),
-              align: 'Center',
-              offset: 0,
-              requestedWidth: markerWidth,
-              textSize: 12,
-              color: selected ? homeColors.white : homeColors.ink,
-              haloColor: 'transparent',
-            }}
-            onTap={() => onSelectHouse(house.id)}
-          >
-            <HomePriceMarker house={house} selected={selected} width={markerWidth} height={markerHeight} />
-          </TestableMarker>
+          <TestableNaverMapMarkerOverlay
+            key={item.house.id}
+            testID={`home-house-marker-${item.house.id}`}
+            latitude={item.coordinate.latitude}
+            longitude={item.coordinate.longitude}
+            width={selected ? SELECTED_MARKER_WIDTH : ICON_MARKER_SIZE}
+            height={selected ? SELECTED_MARKER_HEIGHT : ICON_MARKER_SIZE}
+            anchor={{ x: 0.5, y: selected ? 0.9 : 0.5 }}
+            image={selected ? SELECTED_MARKER_IMAGE : HOUSE_MARKER_IMAGE}
+            isForceShowIcon
+            zIndex={selected ? 120 : 60}
+            caption={selected ? getSelectedMarkerCaption(item.house) : undefined}
+            subCaption={selected ? getSelectedMarkerSubCaption(item.house) : undefined}
+            onTap={() => onSelectHouse(item.house.id)}
+          />
         );
       })}
+
+      {userLocation ? (
+        <TestableNaverMapMarkerOverlay
+          testID="home-current-location-marker"
+          latitude={userLocation.latitude}
+          longitude={userLocation.longitude}
+          width={CURRENT_LOCATION_MARKER_SIZE}
+          height={CURRENT_LOCATION_MARKER_SIZE}
+          anchor={{ x: 0.5, y: 0.5 }}
+          image={CURRENT_LOCATION_MARKER_IMAGE}
+          isForceShowIcon
+          zIndex={200}
+        />
+      ) : null}
     </>
   );
 }
 
-function HomePriceMarker({
-  house,
-  selected,
-  width,
-  height,
+function HomeSearchFilterBar({
+  query,
+  activeFilterCount,
+  onQueryChange,
+  onFilterPress,
 }: {
-  house: House;
-  selected: boolean;
-  width: number;
-  height: number;
+  query: string;
+  activeFilterCount: number;
+  onQueryChange: (value: string) => void;
+  onFilterPress: () => void;
 }) {
-  const price = formatMarkerPrice(house);
-
   return (
-    <View
-      key={`${house.id}/${selected}/${price}/${width}/${height}`}
-      testID={`home-price-marker-${house.id}`}
-      collapsable={false}
-      style={[styles.priceMarkerShell, { width, height }]}
-    >
-      <View style={[styles.priceMarkerPill, selected && styles.selectedPriceMarkerPill]} />
-      <View style={[styles.priceMarkerTail, selected && styles.selectedPriceMarkerTail]} />
+    <View testID="home-top-bar" style={styles.topBar}>
+      <View style={styles.searchPill}>
+        <TextInput
+          value={query}
+          onChangeText={onQueryChange}
+          placeholder="장소, 지명, 집 이름 검색"
+          placeholderTextColor={homeColors.ink70}
+          autoCorrect={false}
+          returnKeyType="search"
+          style={styles.searchInput}
+        />
+        <View style={styles.searchButton}>
+          <Ionicons name="search" size={17} color={homeColors.white} />
+        </View>
+      </View>
+
+      <Pressable
+        testID="home-filter-button"
+        accessibilityRole="button"
+        accessibilityLabel="필터"
+        onPress={onFilterPress}
+        style={styles.filterButton}
+      >
+        <Ionicons name="options-outline" size={21} color={homeColors.white} />
+        {activeFilterCount > 0 ? (
+          <View testID="home-filter-badge" style={styles.filterBadge}>
+            <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+          </View>
+        ) : null}
+      </Pressable>
     </View>
   );
 }
 
 function HomeCarousel({
   houses,
+  hasAnyHouses,
   selectedHouseId,
+  sortMode,
+  sortOpen,
+  sheetRef,
   onSelectHouse,
   onOpenHouse,
+  onCreateHouse,
+  onSortOpenChange,
+  onSortChange,
 }: {
   houses: House[];
+  hasAnyHouses: boolean;
   selectedHouseId: string | null;
+  sortMode: HomeSortMode;
+  sortOpen: boolean;
+  sheetRef: RefObject<ComponentRef<typeof BottomSheet>>;
   onSelectHouse: (houseId: string) => void;
   onOpenHouse: (houseId: string) => void;
+  onCreateHouse: () => void;
+  onSortOpenChange: (open: boolean) => void;
+  onSortChange: (sortMode: HomeSortMode) => void;
 }) {
   const carouselRef = useRef<ScrollView>(null);
+  const snapPoints = useMemo(() => SHEET_SNAP_POINTS, []);
   const activeIndex = Math.max(
     0,
     houses.findIndex((house) => house.id === selectedHouseId),
@@ -466,32 +624,182 @@ function HomeCarousel({
   };
 
   return (
-    <View style={styles.carouselSheet}>
-      <View style={styles.sheetHandle} />
-      <View style={styles.sheetHeader}>
-        <View style={styles.sheetTitleGroup}>
-          <Text style={styles.sheetTitle}>이 근처 내 집</Text>
-          <Text style={styles.sheetCount}>{houses.length}</Text>
+    <BottomSheet
+      ref={sheetRef}
+      index={0}
+      snapPoints={snapPoints}
+      enableDynamicSizing={false}
+      handleComponent={() => (
+        <View style={styles.sheetHandleWrap}>
+          <View style={styles.sheetHandle} />
         </View>
-        <View style={styles.sortPill}>
-          <Text style={styles.sortText}>최근 본 순</Text>
-          <Ionicons name="chevron-down" size={12} color={homeColors.muted} />
+      )}
+      backgroundStyle={styles.sheetBackground}
+      style={styles.sheetShadow}
+    >
+      <BottomSheetView testID="home-result-sheet" style={styles.sheetBody}>
+        <View style={styles.sheetHeader}>
+          <View style={styles.sheetTitleGroup}>
+            <Text style={styles.sheetTitle}>이 근처 내 집</Text>
+            <Text style={styles.sheetCount}>{houses.length}</Text>
+          </View>
+          <Pressable
+            testID="home-sort-button"
+            accessibilityRole="button"
+            onPress={() => onSortOpenChange(!sortOpen)}
+            style={styles.sortPill}
+          >
+            <Text testID="home-sort-label" style={styles.sortText}>
+              {getSortLabel(sortMode)}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={homeColors.muted} />
+          </Pressable>
         </View>
+
+        {sortOpen ? (
+          <View style={styles.sortMenu}>
+            {SORT_OPTIONS.map((option) => (
+              <Pressable
+                key={option.key}
+                testID={option.testID}
+                accessibilityRole="button"
+                onPress={() => onSortChange(option.key)}
+                style={[styles.sortMenuItem, option.key === sortMode && styles.activeSortMenuItem]}
+              >
+                <Text style={[styles.sortMenuText, option.key === sortMode && styles.activeSortMenuText]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {houses.length > 0 ? (
+          <ScrollView
+            ref={carouselRef}
+            testID="home-house-carousel"
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_SNAP_INTERVAL}
+            decelerationRate="fast"
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            contentContainerStyle={styles.cardScroller}
+          >
+            {houses.map((house) => (
+              <HomeHouseCard
+                key={house.id}
+                house={house}
+                active={house.id === selectedHouseId}
+                onSelect={() => onSelectHouse(house.id)}
+                onOpen={() => onOpenHouse(house.id)}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {houses.length === 0 && !hasAnyHouses ? (
+          <View style={styles.emptyNearby}>
+            <Text style={styles.emptyNearbyTitle}>아직 기록한 집이 없어요</Text>
+            <Text style={styles.emptyNearbyBody}>처음 둘러본 집부터 기록하면 지도와 보관함에 쌓여요.</Text>
+            <Pressable accessibilityRole="button" onPress={onCreateHouse} style={styles.emptyCta}>
+              <Text style={styles.emptyCtaText}>첫 집 기록하기</Text>
+            </Pressable>
+          </View>
+        ) : houses.length === 0 ? (
+          <View style={styles.emptyNearby}>
+            <Text style={styles.emptyNearbyTitle}>이 조건에 맞는 집이 없어요</Text>
+            <Text style={styles.emptyNearbyBody}>지도를 움직이거나 검색어와 필터를 조정해보세요.</Text>
+          </View>
+        ) : null}
+      </BottomSheetView>
+    </BottomSheet>
+  );
+}
+
+function HomeFullListMode({
+  houses,
+  hasAnyHouses,
+  selectedHouseId,
+  query,
+  activeFilterCount,
+  sortMode,
+  sortOpen,
+  topInset,
+  onQueryChange,
+  onFilterPress,
+  onSelectHouse,
+  onOpenHouse,
+  onCreateHouse,
+  onSortOpenChange,
+  onSortChange,
+}: {
+  houses: House[];
+  hasAnyHouses: boolean;
+  selectedHouseId: string | null;
+  query: string;
+  activeFilterCount: number;
+  sortMode: HomeSortMode;
+  sortOpen: boolean;
+  topInset: number;
+  onQueryChange: (value: string) => void;
+  onFilterPress: () => void;
+  onSelectHouse: (houseId: string) => void;
+  onOpenHouse: (houseId: string) => void;
+  onCreateHouse: () => void;
+  onSortOpenChange: (open: boolean) => void;
+  onSortChange: (sortMode: HomeSortMode) => void;
+}) {
+  return (
+    <View testID="home-full-list-mode" style={[styles.fullListMode, { paddingTop: topInset + 5 }]}>
+      <View style={styles.fullListHeader}>
+        <HomeSearchFilterBar
+          query={query}
+          activeFilterCount={activeFilterCount}
+          onQueryChange={onQueryChange}
+          onFilterPress={onFilterPress}
+        />
+
+        <View style={styles.fullListTitleRow}>
+          <View style={styles.sheetTitleGroup}>
+            <Text style={styles.sheetTitle}>이 근처 내 집</Text>
+            <Text style={styles.sheetCount}>{houses.length}</Text>
+          </View>
+          <Pressable
+            testID="home-sort-button"
+            accessibilityRole="button"
+            onPress={() => onSortOpenChange(!sortOpen)}
+            style={styles.sortPill}
+          >
+            <Text testID="home-sort-label" style={styles.sortText}>
+              {getSortLabel(sortMode)}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={homeColors.muted} />
+          </Pressable>
+        </View>
+
+        {sortOpen ? (
+          <View style={styles.fullListSortMenu}>
+            {SORT_OPTIONS.map((option) => (
+              <Pressable
+                key={option.key}
+                testID={option.testID}
+                accessibilityRole="button"
+                onPress={() => onSortChange(option.key)}
+                style={[styles.sortMenuItem, option.key === sortMode && styles.activeSortMenuItem]}
+              >
+                <Text style={[styles.sortMenuText, option.key === sortMode && styles.activeSortMenuText]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       {houses.length > 0 ? (
-        <ScrollView
-          ref={carouselRef}
-          testID="home-house-carousel"
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={CARD_SNAP_INTERVAL}
-          decelerationRate="fast"
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          contentContainerStyle={styles.cardScroller}
-        >
+        <ScrollView testID="home-full-list" style={styles.fullListBody} contentContainerStyle={styles.fullListContent}>
           {houses.map((house) => (
-            <HomeHouseCard
+            <HomeFullListRow
               key={house.id}
               house={house}
               active={house.id === selectedHouseId}
@@ -501,12 +809,84 @@ function HomeCarousel({
           ))}
         </ScrollView>
       ) : (
-        <View style={styles.emptyNearby}>
-          <Text style={styles.emptyNearbyTitle}>이 지도 영역에 기록한 집이 없어요</Text>
-          <Text style={styles.emptyNearbyBody}>지도를 조금 움직이거나 검색어를 바꿔보세요.</Text>
+        <View style={styles.fullListEmpty}>
+          <Text style={styles.emptyNearbyTitle}>
+            {hasAnyHouses ? '조건에 맞는 집이 없어요' : '아직 기록한 집이 없어요'}
+          </Text>
+          <Text style={styles.emptyNearbyBody}>
+            {hasAnyHouses
+              ? '지도 위치, 검색어, 필터를 조금 넓혀서 다시 확인해보세요.'
+              : '처음 둘러본 집부터 기록하면 지도와 목록에서 바로 비교할 수 있어요.'}
+          </Text>
+          {!hasAnyHouses ? (
+            <Pressable accessibilityRole="button" onPress={onCreateHouse} style={styles.emptyCta}>
+              <Text style={styles.emptyCtaText}>첫 집 기록하기</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
     </View>
+  );
+}
+
+function HomeFullListRow({
+  house,
+  active,
+  onSelect,
+  onOpen,
+}: {
+  house: House;
+  active: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+}) {
+  const rating = getAverageRating(house);
+  const visitedAt = new Date(house.createdAt);
+  const visitedLabel = Number.isNaN(visitedAt.getTime())
+    ? '기록'
+    : `${visitedAt.getMonth() + 1}. ${visitedAt.getDate()}. 기록`;
+
+  return (
+    <Pressable
+      testID={`home-full-list-row-${house.id}`}
+      accessibilityRole="button"
+      onPress={onSelect}
+      style={[styles.fullListRow, active && styles.activeFullListRow]}
+    >
+      <View style={[styles.fullListDealTile, active && styles.activeFullListDealTile]}>
+        <Text style={[styles.fullListDealText, active && styles.activeFullListDealText]}>
+          {getMarkerDealTypeLabel(house).replace('세', '')}
+        </Text>
+      </View>
+
+      <View style={styles.fullListRowMain}>
+        <View style={styles.fullListRowTitleLine}>
+          <Text style={styles.fullListRowTitle} numberOfLines={1}>
+            {getHouseTitle(house)}
+          </Text>
+          {rating > 0 ? <Text style={styles.fullListRating}>★ {rating.toFixed(1)}</Text> : null}
+        </View>
+        <Text style={styles.fullListAddress} numberOfLines={1}>
+          {getHouseSubtitle(house)}
+        </Text>
+        <Text style={styles.fullListPrice} numberOfLines={1}>
+          {formatHousePrice(house)}
+          <Text style={styles.fullListMeta}>  {getHouseMeta(house)}</Text>
+        </Text>
+        <Text style={styles.fullListVisited}>{visitedLabel}</Text>
+      </View>
+
+      <Pressable
+        testID={`open-house-detail-${house.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${getHouseTitle(house)} 상세 보기`}
+        onPress={onOpen}
+        hitSlop={10}
+        style={styles.fullListChevron}
+      >
+        <Ionicons name="chevron-forward" size={19} color={homeColors.muted} />
+      </Pressable>
+    </Pressable>
   );
 }
 
@@ -580,14 +960,6 @@ function HomeHouseCard({
   );
 }
 
-function MapTool({ icon, label }: { icon: IoniconName; label: string }) {
-  return (
-    <View accessibilityLabel={label} style={styles.mapToolButton}>
-      <Ionicons name={icon} size={18} color={homeColors.ink70} />
-    </View>
-  );
-}
-
 function FilterSheet({
   sourceHouses,
   appliedFilter,
@@ -600,8 +972,12 @@ function FilterSheet({
   onClose: () => void;
 }) {
   const [draftFilter, setDraftFilter] = useState<HomeFilterState>(() => appliedFilter);
+  const [rangeDragging, setRangeDragging] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState(FILTER_SNAP_HEIGHTS.HALF);
   const dragStartY = useRef<number | null>(null);
   const lastDragY = useRef<number | null>(null);
+  const dragStartHeight = useRef(FILTER_SNAP_HEIGHTS.HALF);
+  const dragStartAt = useRef(0);
 
   const previewCount = useMemo(
     () => filterHousesByHomeFilter(sourceHouses, draftFilter).length,
@@ -609,7 +985,11 @@ function FilterSheet({
   );
 
   const setDealType = (dealType: DealFilter) => {
-    setDraftFilter((current) => ({ ...current, dealType }));
+    setDraftFilter((current) => ({
+      ...current,
+      dealType,
+      rent: dealType === 'JEONSE' ? RENT_LIMITS : current.rent,
+    }));
   };
 
   const toggleAreaBucket = (bucket: AreaBucket | null) => {
@@ -629,25 +1009,41 @@ function FilterSheet({
   const handleDragGrant = (event: GestureResponderEvent) => {
     dragStartY.current = event.nativeEvent.pageY;
     lastDragY.current = event.nativeEvent.pageY;
+    dragStartHeight.current = sheetHeight;
+    dragStartAt.current = Date.now();
   };
 
   const handleDragMove = (event: GestureResponderEvent) => {
     lastDragY.current = event.nativeEvent.pageY;
+    if (dragStartY.current == null) return;
+    const deltaY = event.nativeEvent.pageY - dragStartY.current;
+    setSheetHeight(clamp(dragStartHeight.current - deltaY, FILTER_SNAP_HEIGHTS.PEEK, FILTER_SNAP_HEIGHTS.FULL));
   };
 
   const handleDragRelease = (event: GestureResponderEvent) => {
     const startY = dragStartY.current;
     const endY = event.nativeEvent.pageY ?? lastDragY.current;
+    const elapsed = Date.now() - dragStartAt.current;
     dragStartY.current = null;
     lastDragY.current = null;
-    if (typeof startY === 'number' && endY - startY > 80) onClose();
+    if (typeof startY !== 'number' || typeof endY !== 'number') return;
+
+    const deltaY = endY - startY;
+    const isFastDownFlick = deltaY > 60 && elapsed < 220;
+    if (deltaY > 120 || isFastDownFlick) {
+      onClose();
+      return;
+    }
+
+    const releasedHeight = clamp(dragStartHeight.current - deltaY, FILTER_SNAP_HEIGHTS.PEEK, FILTER_SNAP_HEIGHTS.FULL);
+    setSheetHeight(findNearestFilterSnap(releasedHeight));
   };
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
       <View style={styles.filterDim}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.filterSheet}>
+        <View testID="filter-sheet" style={[styles.filterSheet, { height: sheetHeight }]}>
           <View
             testID="filter-sheet-drag-zone"
             onStartShouldSetResponder={() => true}
@@ -671,7 +1067,12 @@ function FilterSheet({
             </View>
           </View>
 
-          <ScrollView style={styles.filterBody} contentContainerStyle={styles.filterBodyContent}>
+          <ScrollView
+            testID="filter-body"
+            style={styles.filterBody}
+            scrollEnabled={!rangeDragging}
+            contentContainerStyle={styles.filterBodyContent}
+          >
             <FilterSection title="거래 유형">
               <View style={styles.segmented}>
                 {[
@@ -697,20 +1098,30 @@ function FilterSheet({
 
             <FilterSection title="보증금" value={formatFilterRange(draftFilter.deposit, DEPOSIT_LIMITS)}>
               <RangeControl
+                testID="filter-deposit-range"
                 range={draftFilter.deposit}
                 limits={DEPOSIT_LIMITS}
                 step={500}
                 onChange={(deposit) => setDraftFilter((current) => ({ ...current, deposit }))}
+                onDragStateChange={setRangeDragging}
               />
             </FilterSection>
-            <FilterSection title="월세" value={formatFilterRange(draftFilter.rent, RENT_LIMITS)}>
-              <RangeControl
-                range={draftFilter.rent}
-                limits={RENT_LIMITS}
-                step={5}
-                onChange={(rent) => setDraftFilter((current) => ({ ...current, rent }))}
-              />
-            </FilterSection>
+            {draftFilter.dealType !== 'JEONSE' ? (
+              <FilterSection
+                testID="filter-rent-section"
+                title="월세"
+                value={formatFilterRange(draftFilter.rent, RENT_LIMITS)}
+              >
+                <RangeControl
+                  testID="filter-rent-range"
+                  range={draftFilter.rent}
+                  limits={RENT_LIMITS}
+                  step={5}
+                  onChange={(rent) => setDraftFilter((current) => ({ ...current, rent }))}
+                  onDragStateChange={setRangeDragging}
+                />
+              </FilterSection>
+            ) : null}
             <FilterSection title="평수">
               <View style={styles.filterChips}>
                 <FilterChip
@@ -760,7 +1171,7 @@ function FilterSheet({
               onPress={() => onApply(draftFilter)}
               style={styles.filterApplyButton}
             >
-              <Text style={styles.filterApplyText}>{previewCount}개 매물 보기</Text>
+              <Text style={styles.filterApplyText}>{previewCount}개 집 보기</Text>
             </Pressable>
           </View>
         </View>
@@ -793,16 +1204,18 @@ function FilterChip({
 }
 
 function FilterSection({
+  testID,
   title,
   value,
   children,
 }: {
+  testID?: string;
   title: string;
   value?: string;
   children: ReactNode;
 }) {
   return (
-    <View style={styles.filterSection}>
+    <View testID={testID} style={styles.filterSection}>
       <View style={styles.filterSectionHeader}>
         <Text style={styles.filterSectionTitle}>{title}</Text>
         {value ? <Text style={styles.filterSectionValue}>{value}</Text> : null}
@@ -813,15 +1226,19 @@ function FilterSection({
 }
 
 function RangeControl({
+  testID,
   range,
   limits,
   step,
   onChange,
+  onDragStateChange,
 }: {
+  testID?: string;
   range: NumericRange;
   limits: NumericRange;
   step: number;
   onChange: (range: NumericRange) => void;
+  onDragStateChange?: (dragging: boolean) => void;
 }) {
   const [trackWidth, setTrackWidth] = useState(1);
   const [activeThumb, setActiveThumb] = useState<'min' | 'max' | null>(null);
@@ -852,19 +1269,27 @@ function RangeControl({
 
   return (
     <View
+      testID={testID}
       style={styles.rangeTrack}
       onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
       onStartShouldSetResponder={() => true}
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(event) => {
+        onDragStateChange?.(true);
         const value = valueFromLocation(event.nativeEvent.locationX);
         const thumb = Math.abs(value - range.min) <= Math.abs(value - range.max) ? 'min' : 'max';
         setActiveThumb(thumb);
         updateRangeFromTouch(event, thumb);
       }}
       onResponderMove={(event) => updateRangeFromTouch(event)}
-      onResponderRelease={() => setActiveThumb(null)}
-      onResponderTerminate={() => setActiveThumb(null)}
+      onResponderRelease={() => {
+        setActiveThumb(null);
+        onDragStateChange?.(false);
+      }}
+      onResponderTerminate={() => {
+        setActiveThumb(null);
+        onDragStateChange?.(false);
+      }}
     >
       <View style={styles.rangeRail} />
       <View style={[styles.rangeActive, { left: `${lowerPercent}%`, width: `${activeWidth}%` }]} />
@@ -874,15 +1299,150 @@ function RangeControl({
   );
 }
 
+function buildHomeMarkerItems(houses: House[], selectedHouseId: string | null, zoomLevel: number): HomeMarkerItem[] {
+  const housesWithCoordinates = houses
+    .map((house) => ({ house, coordinate: getHouseCoordinate(house) }))
+    .filter((item): item is { house: House; coordinate: MapCoordinate } => Boolean(item.coordinate));
+
+  if (zoomLevel >= INDIVIDUAL_MARKER_MIN_ZOOM) {
+    return housesWithCoordinates.map(({ house, coordinate }) => ({ type: 'house', house, coordinate }));
+  }
+
+  const cellSize = getClusterCellSize(zoomLevel);
+  const groups = new Map<string, { house: House; coordinate: MapCoordinate }[]>();
+
+  housesWithCoordinates.forEach((item) => {
+    const key = `${Math.floor(item.coordinate.latitude / cellSize)}:${Math.floor(item.coordinate.longitude / cellSize)}`;
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  });
+
+  return Array.from(groups.values()).map((group) => {
+    const first = group[0];
+    if (!first) {
+      throw new Error('Home marker cluster group cannot be empty');
+    }
+
+    if (group.length === 1) {
+      return { type: 'house', house: first.house, coordinate: first.coordinate };
+    }
+
+    const houseIds = group.map((item) => item.house.id);
+    const sortedHouseIds = [...houseIds].sort();
+    const representativeHouseId = selectedHouseId && houseIds.includes(selectedHouseId) ? selectedHouseId : first.house.id;
+    return {
+      type: 'cluster',
+      id: sortedHouseIds.join('-'),
+      coordinate: getAverageCoordinate(group.map((item) => item.house)) ?? first.coordinate,
+      count: group.length,
+      houseIds,
+      representativeHouseId,
+    };
+  });
+}
+
+function getClusterCellSize(zoomLevel: number): number {
+  if (zoomLevel <= 10) return 0.08;
+  if (zoomLevel <= 11) return 0.04;
+  return 0.02;
+}
+
+function getSelectedMarkerCaption(house: House) {
+  return {
+    text: getMarkerDealTypeLabel(house),
+    align: 'Center' as const,
+    color: homeColors.white,
+    haloColor: 'transparent',
+    textSize: 10,
+    requestedWidth: SELECTED_MARKER_WIDTH,
+    offset: -8,
+  };
+}
+
+function getSelectedMarkerSubCaption(house: House) {
+  return {
+    text: formatMarkerPrice(house),
+    color: homeColors.white,
+    haloColor: 'transparent',
+    textSize: 14,
+    requestedWidth: SELECTED_MARKER_WIDTH,
+  };
+}
+
+function getMarkerDealTypeLabel(house: House): string {
+  if (house.dealType === 'JEONSE') return '전세';
+  if (house.dealType === 'BAN_JEONSE') return '반전세';
+  return '월세';
+}
+
 function formatMarkerPrice(house: House): string {
   if (house.dealType === 'JEONSE') return formatDepositShort(house.deposit);
 
-  const deposit = house.deposit >= 10000 ? formatDepositShort(house.deposit) : `${house.deposit}`;
-  return `${deposit}/${house.rent ?? 0}`;
+  const deposit = house.deposit >= 10000 ? formatDepositShort(house.deposit) : house.deposit.toLocaleString('ko-KR');
+  const rent = (house.rent ?? 0).toLocaleString('ko-KR');
+  return `${deposit} / ${rent}`;
 }
 
-function formatMarkerCaption(house: House): string {
-  return `${house.dealType === 'JEONSE' ? '전' : '월'} ${formatMarkerPrice(house)}`;
+function getAverageCoordinate(houses: House[]): MapCoordinate | null {
+  const coordinates = houses.map(getHouseCoordinate).filter((coordinate): coordinate is MapCoordinate => Boolean(coordinate));
+  if (coordinates.length === 0) return null;
+
+  const sum = coordinates.reduce(
+    (acc, coordinate) => ({
+      latitude: acc.latitude + coordinate.latitude,
+      longitude: acc.longitude + coordinate.longitude,
+    }),
+    { latitude: 0, longitude: 0 },
+  );
+
+  return {
+    latitude: sum.latitude / coordinates.length,
+    longitude: sum.longitude / coordinates.length,
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function findNearestFilterSnap(height: number): number {
+  return Object.values(FILTER_SNAP_HEIGHTS).reduce((nearest, candidate) =>
+    Math.abs(candidate - height) < Math.abs(nearest - height) ? candidate : nearest,
+  );
+}
+
+function getSortLabel(sortMode: HomeSortMode): string {
+  return SORT_OPTIONS.find((option) => option.key === sortMode)?.label ?? '최근 본 순';
+}
+
+function sortHomeHouses(houses: House[], sortMode: HomeSortMode, baseCoordinate: MapCoordinate | null): House[] {
+  return [...houses].sort((a, b) => {
+    switch (sortMode) {
+      case 'DISTANCE':
+        return getDistanceScore(a, baseCoordinate) - getDistanceScore(b, baseCoordinate);
+      case 'PRICE_ASC':
+        return getPriceSortValue(a) - getPriceSortValue(b);
+      case 'RATING_DESC':
+        return getAverageRating(b) - getAverageRating(a);
+      case 'RECENT':
+      default:
+        return b.createdAt.localeCompare(a.createdAt);
+    }
+  });
+}
+
+function getDistanceScore(house: House, baseCoordinate: MapCoordinate | null): number {
+  const coordinate = getHouseCoordinate(house);
+  if (!coordinate || !baseCoordinate) return Number.MAX_SAFE_INTEGER;
+  const latitudeDistance = coordinate.latitude - baseCoordinate.latitude;
+  const longitudeDistance = coordinate.longitude - baseCoordinate.longitude;
+  return latitudeDistance * latitudeDistance + longitudeDistance * longitudeDistance;
+}
+
+function getPriceSortValue(house: House): number {
+  if (house.dealType === 'JEONSE') return house.deposit;
+  return house.deposit + (house.rent ?? 0) * 100;
 }
 
 function filterHousesByHomeFilter(houses: House[], filter: HomeFilterState): House[] {
@@ -951,7 +1511,7 @@ function countActiveFilters(filter: HomeFilterState): number {
   let count = 0;
   if (filter.dealType !== 'ALL') count += 1;
   if (!isDefaultRange(filter.deposit, DEPOSIT_LIMITS)) count += 1;
-  if (!isDefaultRange(filter.rent, RENT_LIMITS)) count += 1;
+  if (filter.dealType !== 'JEONSE' && !isDefaultRange(filter.rent, RENT_LIMITS)) count += 1;
   if (filter.areaBuckets.length > 0) count += 1;
   if (filter.roomBuckets.length > 0) count += 1;
   return count;
@@ -999,25 +1559,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingLeft: spacing.md,
+    paddingLeft: spacing.lg,
     paddingRight: 6,
     borderRadius: 24,
     backgroundColor: homeColors.white,
     borderWidth: 1,
     borderColor: homeColors.borderSoft,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
   },
   searchInput: {
-    ...typography.caption,
     flex: 1,
     minWidth: 0,
     paddingVertical: 0,
     color: homeColors.ink,
+    fontSize: 15,
     fontWeight: '500',
+    lineHeight: 20,
   },
   searchButton: {
     width: 36,
@@ -1037,10 +1598,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: homeColors.ink,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
   },
   filterBadge: {
     position: 'absolute',
@@ -1076,7 +1637,7 @@ const styles = StyleSheet.create({
   mapTools: {
     position: 'absolute',
     right: 14,
-    bottom: 335,
+    bottom: 303,
     gap: spacing.sm,
   },
   mapToolButton: {
@@ -1089,92 +1650,192 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: homeColors.borderSoft,
     shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  addHouseButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderColor: homeColors.primary,
+    backgroundColor: homeColors.primary,
   },
   listToggle: {
     position: 'absolute',
     left: '50%',
-    bottom: 325,
+    bottom: 293,
+    width: 86,
     height: 38,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: spacing.lg,
     borderRadius: 19,
-    backgroundColor: homeColors.ink,
-    transform: [{ translateX: -52 }],
+    borderWidth: 1,
+    borderColor: homeColors.ink,
+    backgroundColor: homeColors.white,
+    transform: [{ translateX: -43 }],
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    zIndex: 65,
+    elevation: 65,
+  },
+  listToggleOnList: {
+    borderColor: homeColors.border,
   },
   listToggleText: {
     ...typography.caption,
-    color: homeColors.white,
-    fontWeight: '700',
+    color: homeColors.ink,
+    fontWeight: '800',
+  },
+  mapOverlayLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 12,
+    elevation: 12,
+  },
+  overlayHouseMarker: {
+    position: 'absolute',
+    zIndex: 2,
+    elevation: 2,
+  },
+  overlayClusterMarker: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 28,
+    backgroundColor: homeColors.white,
+    borderWidth: 2,
+    borderColor: homeColors.primary,
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
   },
   priceMarkerShell: {
+    width: SELECTED_MARKER_WIDTH,
+    height: SELECTED_MARKER_HEIGHT,
     alignItems: 'center',
     justifyContent: 'flex-start',
     overflow: 'visible',
   },
-  priceMarkerPill: {
+  selectedPriceMarkerPill: {
     width: '100%',
     height: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     borderRadius: 16,
-    backgroundColor: homeColors.white,
+    backgroundColor: homeColors.coral,
+    borderColor: homeColors.coral,
     borderWidth: 1.5,
-    borderColor: homeColors.borderSoft,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     elevation: 7,
   },
-  selectedPriceMarkerPill: {
-    backgroundColor: homeColors.coral,
-    borderColor: homeColors.coral,
+  priceMarkerDealText: {
+    color: homeColors.white,
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+    includeFontPadding: false,
+    textAlign: 'center',
   },
-  priceMarkerTail: {
+  priceMarkerText: {
+    color: homeColors.white,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 15,
+    includeFontPadding: false,
+    textAlign: 'center',
+  },
+  selectedPriceMarkerTail: {
     width: 8,
     height: 8,
     marginTop: -5,
-    backgroundColor: homeColors.white,
+    backgroundColor: homeColors.coral,
     borderRightWidth: 1.5,
     borderBottomWidth: 1.5,
-    borderColor: homeColors.borderSoft,
+    borderColor: homeColors.coral,
     transform: [{ rotate: '45deg' }],
   },
-  selectedPriceMarkerTail: {
-    backgroundColor: homeColors.coral,
-    borderColor: homeColors.coral,
-  },
-  clusterMarker: {
-    width: 48,
-    height: 48,
+  iconMarker: {
+    width: ICON_MARKER_SIZE,
+    height: ICON_MARKER_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
+    borderRadius: 19,
     backgroundColor: homeColors.white,
-    borderWidth: 2,
-    borderColor: homeColors.primary,
+    borderWidth: 1.5,
+    borderColor: homeColors.borderSoft,
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 7,
+  },
+  currentLocationMarker: {
+    position: 'absolute',
+    width: CURRENT_LOCATION_MARKER_SIZE,
+    height: CURRENT_LOCATION_MARKER_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentLocationHalo: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(34, 132, 245, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 132, 245, 0.28)',
+  },
+  currentLocationDot: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#2284F5',
+    borderWidth: 3,
+    borderColor: homeColors.white,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 8,
   },
   clusterCount: {
-    color: homeColors.ink,
-    fontSize: 16,
+    position: 'absolute',
+    right: 5,
+    top: 4,
+    minWidth: 17,
+    height: 17,
+    overflow: 'hidden',
+    borderRadius: 9,
+    backgroundColor: homeColors.coral,
+    color: homeColors.white,
+    textAlign: 'center',
+    fontSize: 10,
     fontWeight: '800',
-    lineHeight: 18,
-  },
-  clusterLabel: {
-    color: homeColors.muted,
-    fontSize: 8,
-    fontWeight: '700',
+    lineHeight: 17,
+    includeFontPadding: false,
   },
   carouselSheet: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 286,
+    height: 254,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     backgroundColor: homeColors.white,
@@ -1192,6 +1853,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     borderRadius: 3,
     backgroundColor: '#D8D5CD',
+  },
+  sheetShadow: {
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -5 },
+    elevation: 24,
+  },
+  sheetBackground: {
+    backgroundColor: homeColors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+  },
+  sheetHandleWrap: {
+    alignItems: 'center',
+    paddingTop: spacing.sm,
+    backgroundColor: 'transparent',
+  },
+  sheetBody: {
+    flex: 1,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -1228,6 +1909,39 @@ const styles = StyleSheet.create({
     color: homeColors.ink70,
     fontWeight: '600',
   },
+  sortMenu: {
+    position: 'absolute',
+    top: 49,
+    right: spacing.lg,
+    zIndex: 5,
+    width: 118,
+    overflow: 'hidden',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: homeColors.borderSoft,
+    backgroundColor: homeColors.white,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  sortMenuItem: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  activeSortMenuItem: {
+    backgroundColor: homeColors.primarySoft,
+  },
+  sortMenuText: {
+    color: homeColors.ink70,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  activeSortMenuText: {
+    color: homeColors.primary,
+  },
   cardScroller: {
     gap: spacing.sm,
     paddingHorizontal: 41,
@@ -1248,6 +1962,157 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
+  },
+  resultList: {
+    flex: 1,
+  },
+  resultListContent: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  fullListMode: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: homeColors.white,
+    zIndex: 40,
+    elevation: 40,
+  },
+  fullListHeader: {
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: homeColors.borderSoft,
+    backgroundColor: homeColors.white,
+    zIndex: 2,
+  },
+  fullListTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  fullListSortMenu: {
+    position: 'absolute',
+    top: 68,
+    right: spacing.lg,
+    zIndex: 8,
+    width: 118,
+    overflow: 'hidden',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: homeColors.borderSoft,
+    backgroundColor: homeColors.white,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  fullListBody: {
+    flex: 1,
+    backgroundColor: homeColors.white,
+  },
+  fullListContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: 88,
+  },
+  fullListRow: {
+    minHeight: 112,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: homeColors.borderSoft,
+    backgroundColor: homeColors.white,
+  },
+  activeFullListRow: {
+    marginHorizontal: -spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 12,
+    borderBottomColor: 'transparent',
+    backgroundColor: '#F5F8F2',
+  },
+  fullListDealTile: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: homeColors.borderSoft,
+    backgroundColor: '#F1EBDD',
+  },
+  activeFullListDealTile: {
+    backgroundColor: '#82A37E',
+  },
+  fullListDealText: {
+    color: homeColors.ink,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  activeFullListDealText: {
+    color: homeColors.white,
+  },
+  fullListRowMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  fullListRowTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  fullListRowTitle: {
+    flex: 1,
+    minWidth: 0,
+    color: homeColors.ink,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  fullListRating: {
+    color: '#D6A33B',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  fullListAddress: {
+    marginTop: 4,
+    color: homeColors.muted,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  fullListPrice: {
+    marginTop: 7,
+    color: homeColors.ink,
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  fullListMeta: {
+    color: homeColors.ink70,
+    fontWeight: '500',
+  },
+  fullListVisited: {
+    marginTop: 6,
+    color: homeColors.muted,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  fullListChevron: {
+    width: 28,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullListEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    backgroundColor: homeColors.white,
   },
   activeHouseCard: {
     borderColor: homeColors.ink,
@@ -1403,13 +2268,23 @@ const styles = StyleSheet.create({
     color: homeColors.muted,
     textAlign: 'center',
   },
+  emptyCta: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: homeColors.ink,
+  },
+  emptyCtaText: {
+    color: homeColors.white,
+    fontWeight: '800',
+  },
   filterDim: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(14, 26, 20, 0.35)',
   },
   filterSheet: {
-    maxHeight: 580,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     backgroundColor: homeColors.white,
@@ -1539,7 +2414,7 @@ const styles = StyleSheet.create({
     color: homeColors.primary,
   },
   filterBody: {
-    maxHeight: 420,
+    flex: 1,
   },
   filterBodyContent: {
     paddingBottom: spacing.md,

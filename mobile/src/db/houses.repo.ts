@@ -34,6 +34,14 @@ type HouseRow = {
   neighborhood: number | null;
   first_impression: number | null;
   memo: string | null;
+  nickname: string | null;
+  visited_at: string | null;
+  room_type: string | null;
+  floor_type: string | null;
+  direction: string | null;
+  maintenance_includes_json: string | null;
+  utility_estimates_json: string | null;
+  full_option: number | null;
   contracted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -70,6 +78,18 @@ function rowToHouse(r: HouseRow, photoIds: string[]): House {
     neighborhood: r.neighborhood ?? undefined,
     firstImpression: r.first_impression ?? undefined,
     memo: r.memo ?? undefined,
+    nickname: r.nickname ?? undefined,
+    visitedAt: r.visited_at ?? undefined,
+    roomType: (r.room_type ?? undefined) as House['roomType'],
+    floorType: (r.floor_type ?? undefined) as House['floorType'],
+    direction: (r.direction ?? undefined) as House['direction'],
+    maintenanceIncludes: r.maintenance_includes_json
+      ? (JSON.parse(r.maintenance_includes_json) as House['maintenanceIncludes'])
+      : undefined,
+    utilityEstimates: r.utility_estimates_json
+      ? (JSON.parse(r.utility_estimates_json) as House['utilityEstimates'])
+      : undefined,
+    fullOption: r.full_option === null ? undefined : r.full_option === 1,
     contractedAt: r.contracted_at ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -98,8 +118,10 @@ export const housesRepo = {
         security_json, garbage,
         water_pressure, sunlight, noise, insulation, ventilation,
         moisture, neighborhood, first_impression,
-        memo, contracted_at, created_at, updated_at, is_dirty, is_deleted
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,0)`,
+        memo, nickname, visited_at, room_type, floor_type, direction,
+        maintenance_includes_json, utility_estimates_json, full_option,
+        contracted_at, created_at, updated_at, is_dirty, is_deleted
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,0)`,
       h.id,
       userId,
       JSON.stringify(h.address),
@@ -130,6 +152,16 @@ export const housesRepo = {
       h.neighborhood ?? null,
       h.firstImpression ?? null,
       h.memo ?? null,
+      h.nickname ?? null,
+      h.visitedAt ?? null,
+      h.roomType ?? null,
+      h.floorType ?? null,
+      h.direction ?? null,
+      h.maintenanceIncludes ? JSON.stringify(h.maintenanceIncludes) : null,
+      h.utilityEstimates && Object.keys(h.utilityEstimates).length > 0
+        ? JSON.stringify(h.utilityEstimates)
+        : null,
+      h.fullOption == null ? null : h.fullOption ? 1 : 0,
       h.contractedAt ?? null,
       h.createdAt,
       h.updatedAt,
@@ -146,7 +178,9 @@ export const housesRepo = {
         has_parking=?, options_json=?, security_json=?, garbage=?,
         water_pressure=?, sunlight=?, noise=?, insulation=?, ventilation=?,
         moisture=?, neighborhood=?, first_impression=?,
-        memo=?, contracted_at=?, updated_at=?, is_dirty=1
+        memo=?, nickname=?, visited_at=?, room_type=?, floor_type=?, direction=?,
+        maintenance_includes_json=?, utility_estimates_json=?, full_option=?,
+        contracted_at=?, updated_at=?, is_dirty=1
       WHERE id = ?`,
       JSON.stringify(h.address),
       h.dealType,
@@ -176,6 +210,16 @@ export const housesRepo = {
       h.neighborhood ?? null,
       h.firstImpression ?? null,
       h.memo ?? null,
+      h.nickname ?? null,
+      h.visitedAt ?? null,
+      h.roomType ?? null,
+      h.floorType ?? null,
+      h.direction ?? null,
+      h.maintenanceIncludes ? JSON.stringify(h.maintenanceIncludes) : null,
+      h.utilityEstimates && Object.keys(h.utilityEstimates).length > 0
+        ? JSON.stringify(h.utilityEstimates)
+        : null,
+      h.fullOption == null ? null : h.fullOption ? 1 : 0,
       h.contractedAt ?? null,
       h.updatedAt,
       h.id,

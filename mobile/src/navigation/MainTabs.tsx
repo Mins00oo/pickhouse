@@ -23,7 +23,11 @@ export function MainTabs() {
       }}
     >
       <Stack.Screen name="MainTabs" component={BottomTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="HouseInput" component={HouseInputScreen} options={{ title: '새 집 기록' }} />
+      <Stack.Screen
+        name="HouseInput"
+        component={HouseInputScreen}
+        options={{ title: '집 추가', headerShown: false }}
+      />
       <Stack.Screen name="HouseDetail" component={HouseDetailScreen} options={{ title: '집 상세' }} />
     </Stack.Navigator>
   );

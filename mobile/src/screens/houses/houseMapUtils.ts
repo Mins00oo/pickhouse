@@ -67,6 +67,14 @@ export function formatHousePriceShort(house: House): string {
   return `${formatDepositShort(house.deposit)}/${house.rent ?? 0}`;
 }
 
+/** raw 숫자 문자열 → 천단위 콤마 표시 (예: '100000000' → '100,000,000'). 빈 문자열은 그대로. */
+export function formatThousands(raw: string): string {
+  if (!raw) return '';
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return raw;
+  return n.toLocaleString('ko-KR');
+}
+
 export function getHouseMeta(house: House): string {
   const parts: string[] = [];
   if (typeof house.area === 'number') parts.push(`${house.area}평`);

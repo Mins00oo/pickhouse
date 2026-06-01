@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Modal, View, Pressable, Text } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
+import type { WebViewMessageEvent } from 'react-native-webview';
 import { Address } from '@/types';
 import { colors, spacing, typography } from '@/theme';
 
@@ -14,11 +17,19 @@ const HTML = `
 <script>
 new daum.Postcode({
   oncomplete: function(data) {
-    window.ReactNativeWebView.postMessage(JSON.stringify({
-      roadAddress: data.roadAddress,
-      jibunAddress: data.jibunAddress,
-      zonecode: data.zonecode
-    }));
+    try {
+      var msg = JSON.stringify({
+        type: 'address:selected',
+        payload: {
+          roadAddress: data.roadAddress || data.autoRoadAddress || '',
+          jibunAddress: data.jibunAddress || data.autoJibunAddress || '',
+          zonecode: data.zonecode || ''
+        }
+      });
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(msg);
+      }
+    } catch (e) {}
   },
   width: '100%',
   height: '100%'
@@ -33,18 +44,36 @@ export interface KakaoAddressPickerProps {
   onSelect: (addr: Address) => void;
 }
 
+type AddressMessage = {
+  type?: unknown;
+  payload?: {
+    roadAddress?: unknown;
+    jibunAddress?: unknown;
+    zonecode?: unknown;
+  };
+};
+
 export function KakaoAddressPicker({ visible, onClose, onSelect }: KakaoAddressPickerProps) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   function handleMessage(e: WebViewMessageEvent) {
     try {
-      const parsed = JSON.parse(e.nativeEvent.data) as {
-        roadAddress: string;
-        jibunAddress: string;
-        zonecode: string;
-      };
+      const parsed = JSON.parse(e.nativeEvent.data) as AddressMessage;
+      if (parsed.type !== 'address:selected') return;
+      const payload = parsed.payload;
+      if (
+        !payload ||
+        typeof payload.roadAddress !== 'string' ||
+        typeof payload.jibunAddress !== 'string' ||
+        typeof payload.zonecode !== 'string' ||
+        (!payload.roadAddress && !payload.jibunAddress)
+      ) {
+        return;
+      }
       onSelect({
-        roadAddress: parsed.roadAddress,
-        jibunAddress: parsed.jibunAddress,
-        zonecode: parsed.zonecode,
+        roadAddress: payload.roadAddress,
+        jibunAddress: payload.jibunAddress,
+        zonecode: payload.zonecode,
       });
       onClose();
     } catch {
@@ -52,9 +81,13 @@ export function KakaoAddressPicker({ visible, onClose, onSelect }: KakaoAddressP
     }
   }
 
+  function handleLoadError() {
+    setErrorMessage('주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+  }
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.cream }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.cream }} edges={['top', 'bottom']}>
         <View
           style={{
             flexDirection: 'row',
@@ -70,12 +103,23 @@ export function KakaoAddressPicker({ visible, onClose, onSelect }: KakaoAddressP
             <Text style={[typography.body, { color: colors.inkMuted }]}>닫기</Text>
           </Pressable>
         </View>
+        {errorMessage ? (
+          <Text style={[typography.caption, { color: colors.coral, padding: spacing.lg }]}>
+            {errorMessage}
+          </Text>
+        ) : null}
         <WebView
+          testID="kakao-address-webview"
           originWhitelist={['*']}
           source={{ html: HTML }}
+          javaScriptEnabled
+          domStorageEnabled
+          onLoadStart={() => setErrorMessage(null)}
           onMessage={handleMessage}
+          onError={handleLoadError}
+          onHttpError={handleLoadError}
         />
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

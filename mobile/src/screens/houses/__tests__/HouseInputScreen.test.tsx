@@ -1,17 +1,54 @@
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HouseInputScreen } from '../HouseInputScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { housesRepo } from '@/db/houses.repo';
+import { housesApi } from '@/api/houses.api';
 import { syncQueue } from '@/sync/syncQueue';
+import { geocodeAddress } from '@/integrations/kakaoGeocode';
 
 jest.mock('@/db/houses.repo');
+jest.mock('@/api/houses.api');
 jest.mock('@/sync/syncQueue');
 jest.mock('@/db/photos.repo');
 jest.mock('@/photos/cameraHelper');
 
+// 위저드는 Daum WebView(KakaoAddressPicker)를 직접 띄운다 → 선택 결과만 시뮬레이션.
+jest.mock('@/integrations/kakaoAddress', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { Pressable, Text } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    KakaoAddressPicker: ({ onSelect }: { onSelect: (a: unknown) => void }) =>
+      React.createElement(
+        Pressable,
+        {
+          testID: 'mock-address-search',
+          onPress: () =>
+            onSelect({
+              roadAddress: '서울 용산구 청파로47길 22',
+              jibunAddress: '청파동1가 56-3',
+              zonecode: '04303',
+            }),
+        },
+        React.createElement(Text, null, '주소 선택'),
+      ),
+  };
+});
+
+jest.mock('@/integrations/kakaoGeocode', () => ({
+  geocodeAddress: jest.fn().mockResolvedValue({ latitude: 37.556, longitude: 126.901 }),
+}));
+
 let queryClient: QueryClient | null = null;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
 
 const wrap = (c: React.ReactNode) => {
   queryClient = new QueryClient({
@@ -29,9 +66,12 @@ const wrap = (c: React.ReactNode) => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (geocodeAddress as jest.Mock).mockResolvedValue({ latitude: 37.556, longitude: 126.901 });
   useAuthStore.setState({
     user: { id: 'u1', authProviders: {}, createdAt: '' },
-    accessToken: 'a', refreshToken: 'r', status: 'authenticated',
+    accessToken: 'a',
+    refreshToken: 'r',
+    status: 'authenticated',
   });
 });
 
@@ -40,26 +80,269 @@ afterEach(() => {
   queryClient = null;
 });
 
-describe('HouseInputScreen', () => {
-  it('renders two tabs: 현장 모드 / 디테일 모드', () => {
-    const nav = { goBack: jest.fn(), navigate: jest.fn() } as any;
-    const { getByText } = render(wrap(<HouseInputScreen navigation={nav} route={{ params: undefined } as any} />));
-    expect(getByText('현장 모드')).toBeTruthy();
-    expect(getByText('디테일 모드')).toBeTruthy();
+const navMock = () => ({ goBack: jest.fn(), navigate: jest.fn() }) as never;
+const route = (params?: { houseId?: string }) => ({ params } as never);
+
+async function pickAddress(getByTestId: (id: string) => unknown, findByTestId: (id: string) => Promise<unknown>) {
+  fireEvent.press(getByTestId('mock-address-search') as never);
+  await findByTestId('address-detail'); // 좌표 머지 + 주소 적용 대기
+}
+
+describe('HouseInputScreen (위저드)', () => {
+  it('renders the four step tabs and step-1 fields', () => {
+    const { getByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+    expect(getByTestId('add-step-tab-기본')).toBeTruthy();
+    expect(getByTestId('add-step-tab-가격')).toBeTruthy();
+    expect(getByTestId('add-step-tab-구조')).toBeTruthy();
+    expect(getByTestId('add-step-tab-체크')).toBeTruthy();
+    expect(getByTestId('nickname-input')).toBeTruthy();
+    expect(getByTestId('dealtype-월세')).toBeTruthy();
+    expect(getByTestId('address-search')).toBeTruthy();
   });
 
-  it('save in quick mode persists deposit and goes back', async () => {
-    const nav = { goBack: jest.fn(), navigate: jest.fn() } as any;
-    const { getByText, getByPlaceholderText } = render(
-      wrap(<HouseInputScreen navigation={nav} route={{ params: undefined } as any} />),
+  it('jumps to any step non-linearly via the tabs', () => {
+    const { getByTestId, queryByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
     );
-    fireEvent.changeText(getByPlaceholderText('보증금 (만원)'), '1000');
-    fireEvent.changeText(getByPlaceholderText('월세 (만원)'), '50');
-    fireEvent.press(getByText('저장'));
-    await waitFor(() => {
-      expect(housesRepo.insert).toHaveBeenCalled();
-      expect(syncQueue.queueHouseCreate).toHaveBeenCalled();
-      expect(nav.goBack).toHaveBeenCalled();
+    expect(queryByTestId('pyeong-input')).toBeNull();
+    fireEvent.press(getByTestId('add-step-tab-구조'));
+    expect(getByTestId('pyeong-input')).toBeTruthy();
+    fireEvent.press(getByTestId('add-step-tab-체크'));
+    expect(getByTestId('condition-햇빛-좋음')).toBeTruthy();
+  });
+
+  it('dealType toggle swaps the price inputs (전세 hides 월세)', () => {
+    const { getByTestId, queryByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    expect(getByTestId('amount-월세')).toBeTruthy();
+    fireEvent.press(getByTestId('add-step-tab-기본'));
+    fireEvent.press(getByTestId('dealtype-전세'));
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    expect(queryByTestId('amount-월세')).toBeNull();
+    expect(getByTestId('amount-전세금')).toBeTruthy();
+  });
+
+  it('blocks save when required fields are empty', async () => {
+    const nav = navMock();
+    const { getByTestId } = render(wrap(<HouseInputScreen navigation={nav} route={route()} />));
+    fireEvent.press(getByTestId('save-button'));
+    await waitFor(() => expect(housesRepo.insert).not.toHaveBeenCalled());
+    expect((nav as { goBack: jest.Mock }).goBack).not.toHaveBeenCalled();
+  });
+
+  it('saves a 월세 house with geocoded coordinates, queues sync, and navigates back', async () => {
+    const nav = navMock();
+    const { getByTestId, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), '청파동 빌라');
+    await pickAddress(getByTestId, findByTestId);
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    fireEvent.changeText(getByTestId('amount-보증금'), '1000');
+    fireEvent.changeText(getByTestId('amount-월세'), '50');
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
+    expect(geocodeAddress).toHaveBeenCalledWith('서울 용산구 청파로47길 22');
+    expect(housesRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nickname: '청파동 빌라',
+        dealType: 'WOLSE',
+        deposit: 1000,
+        rent: 50,
+        address: expect.objectContaining({ latitude: 37.556, longitude: 126.901 }),
+      }),
+      'u1',
+    );
+    expect(syncQueue.queueHouseCreate).toHaveBeenCalled();
+    expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
+  });
+
+  it('shows the detail address input immediately while geocoding is still pending', async () => {
+    const pending = deferred<{ latitude: number; longitude: number } | null>();
+    (geocodeAddress as jest.Mock).mockReturnValueOnce(pending.promise);
+    const { getByTestId, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+
+    fireEvent.press(getByTestId('mock-address-search') as never);
+
+    expect(await findByTestId('address-detail')).toBeTruthy();
+    expect(geocodeAddress).toHaveBeenCalledWith('서울 용산구 청파로47길 22');
+
+    await act(async () => {
+      pending.resolve(null);
+      await pending.promise;
     });
+  });
+
+  it('shows water as a separate utility estimate when water is not included', () => {
+    const { getByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+
+    expect(getByTestId('utility-수도')).toBeTruthy();
+    expect(getByTestId('utility-전기')).toBeTruthy();
+    expect(getByTestId('utility-가스')).toBeTruthy();
+  });
+
+  it('hides the water utility estimate when water is included in maintenance', () => {
+    const { getByTestId, queryByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    expect(getByTestId('utility-수도')).toBeTruthy();
+
+    fireEvent.press(getByTestId('maint-include-수도'));
+
+    expect(queryByTestId('utility-수도')).toBeNull();
+    expect(getByTestId('utility-전기')).toBeTruthy();
+    expect(getByTestId('utility-가스')).toBeTruthy();
+  });
+
+  it('saves a water utility estimate when water is paid separately', async () => {
+    const nav = navMock();
+    const { getByTestId, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), '구로동 오피스텔');
+    await pickAddress(getByTestId, findByTestId);
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    fireEvent.changeText(getByTestId('amount-보증금'), '1000');
+    fireEvent.changeText(getByTestId('amount-월세'), '50');
+    fireEvent.changeText(getByTestId('utility-수도'), '2');
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
+    expect(housesRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        utilityEstimates: expect.objectContaining({ WATER: 2 }),
+      }),
+      'u1',
+    );
+  });
+
+  it('persists structure & condition fields chosen across steps', async () => {
+    const nav = navMock();
+    const { getByTestId, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), '청파동 빌라');
+    await pickAddress(getByTestId, findByTestId);
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    fireEvent.changeText(getByTestId('amount-보증금'), '1000');
+    fireEvent.changeText(getByTestId('amount-월세'), '50');
+    fireEvent.press(getByTestId('add-step-tab-구조'));
+    fireEvent.press(getByTestId('roomtype-1.5룸'));
+    fireEvent.press(getByTestId('pyeong-preset-9'));
+    fireEvent.press(getByTestId('direction-남향'));
+    fireEvent.press(getByTestId('add-step-tab-체크'));
+    fireEvent.press(getByTestId('condition-햇빛-좋음'));
+    fireEvent.press(getByTestId('switch-엘리베이터'));
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
+    expect(housesRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roomType: 'ONE_AND_HALF',
+        area: 9,
+        direction: 'SOUTH',
+        sunlight: 3,
+        hasElevator: true,
+        floorType: 'GROUND',
+      }),
+      'u1',
+    );
+  });
+
+  it('omits rent for 전세 records', async () => {
+    const nav = navMock();
+    const { getByTestId, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), '서계동 신축');
+    await pickAddress(getByTestId, findByTestId);
+    fireEvent.press(getByTestId('dealtype-전세'));
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    fireEvent.changeText(getByTestId('amount-전세금'), '18000');
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
+    expect(housesRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ dealType: 'JEONSE', deposit: 18000, rent: undefined }),
+      'u1',
+    );
+  });
+
+  it('still saves when geocoding fails (no coordinates)', async () => {
+    (geocodeAddress as jest.Mock).mockResolvedValueOnce(null);
+    const nav = navMock();
+    const { getByTestId, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), '효창동 빌라');
+    await pickAddress(getByTestId, findByTestId);
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    fireEvent.changeText(getByTestId('amount-보증금'), '1000');
+    fireEvent.changeText(getByTestId('amount-월세'), '50');
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
+    const [house] = (housesRepo.insert as jest.Mock).mock.calls[0]!;
+    expect(house.address.latitude).toBeUndefined();
+    expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
+  });
+
+  it('prefills an existing house and updates instead of creating', async () => {
+    const existing = {
+      id: 'h1',
+      address: {
+        roadAddress: '서울 용산구 청파로 1',
+        jibunAddress: '청파동 1',
+        zonecode: '04300',
+        latitude: 37.546,
+        longitude: 126.967,
+        detail: '302호',
+      },
+      dealType: 'WOLSE',
+      deposit: 1200,
+      rent: 55,
+      maintenanceFee: 7,
+      area: 9,
+      floor: 3,
+      nickname: '청파동 빌라',
+      roomType: 'ONE_AND_HALF',
+      floorType: 'GROUND',
+      memo: '기존 메모',
+      photoIds: ['p1'],
+      createdAt: '2026-05-16T00:00:00.000Z',
+      updatedAt: '2026-05-16T00:00:00.000Z',
+    };
+    (housesRepo.findById as jest.Mock).mockResolvedValue(existing);
+    (housesApi.get as jest.Mock).mockRejectedValue(new Error('offline'));
+    const nav = navMock();
+    const { getByTestId, findByDisplayValue } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route({ houseId: 'h1' })} />),
+    );
+
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    // 보증금 1200 은 천단위 콤마로 표시된다
+    expect(await findByDisplayValue('1,200')).toBeTruthy();
+    fireEvent.changeText(getByTestId('amount-월세'), '60');
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesRepo.update).toHaveBeenCalled());
+    expect(housesRepo.insert).not.toHaveBeenCalled();
+    expect(syncQueue.queueHouseUpdate).toHaveBeenCalledWith(
+      'h1',
+      expect.objectContaining({ rent: 60, photoIds: ['p1'] }),
+    );
   });
 });

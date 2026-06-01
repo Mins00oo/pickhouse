@@ -67,8 +67,8 @@ const houses = [
   },
 ] as any[];
 
-function mockHouses() {
-  (housesRepo.listActive as jest.Mock).mockResolvedValue(houses);
+function mockHouses(nextHouses = houses) {
+  (housesRepo.listActive as jest.Mock).mockResolvedValue(nextHouses);
   (housesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
 }
 
@@ -120,5 +120,16 @@ describe('HouseListScreen', () => {
 
     fireEvent.press(await findByTestId('house-list-row-h1'));
     expect(nav.navigate).toHaveBeenCalledWith('HouseDetail', { houseId: 'h1' });
+  });
+
+  it('shows an empty storage state instead of sample houses when there are no records', async () => {
+    mockHouses([]);
+
+    const nav = { navigate: jest.fn(), getParent: jest.fn() } as any;
+    const { findByText, queryByText } = render(wrap(<HouseListScreen navigation={nav} route={{} as any} />));
+
+    expect(await findByText('아직 기록한 집이 없어요')).toBeTruthy();
+    expect(await findByText('홈에서 첫 집을 기록하면 보관함에 모아볼 수 있어요.')).toBeTruthy();
+    expect(queryByText('청파동 빌라')).toBeNull();
   });
 });

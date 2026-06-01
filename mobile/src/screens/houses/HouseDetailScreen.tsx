@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
-import { StarRating } from '@/components/StarRating';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { useHouse, useDeleteHouse } from '@/queries/houses.queries';
-import { HouseStackParamList, Photo, RatingKey, RATING_KEYS } from '@/types';
-import { colors, spacing, typography } from '@/theme';
+import { House, HouseStackParamList, Photo } from '@/types';
+import { colors, conditionColor, conditionLabel, spacing, typography } from '@/theme';
 import { photosRepo } from '@/db/photos.repo';
+import { CONDITION_KEYS, CONDITION_META, normalizeConditionLevel } from './conditionMeta';
+import { directionLabel, roomTypeLabel } from './wizardConstants';
 
 type Props = NativeStackScreenProps<HouseStackParamList, 'HouseDetail'>;
 
@@ -51,7 +53,8 @@ export function HouseDetailScreen({ route, navigation }: Props) {
     ]);
   }
 
-  const presentRatings = RATING_KEYS.filter((k) => typeof house[k] === 'number');
+  const presentConditions = CONDITION_KEYS.filter((k) => typeof house[k] === 'number');
+  const floorText = floorLabel(house);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.cream }} edges={['bottom']}>
@@ -59,10 +62,16 @@ export function HouseDetailScreen({ route, navigation }: Props) {
         <Card>
           <Text style={typography.caption}>주소</Text>
           <Text style={[typography.heading, { marginTop: spacing.xs }]}>
-            {house.address.roadAddress || '주소 미입력'}
+            {house.nickname?.trim() || house.address.roadAddress || '주소 미입력'}
           </Text>
+          {house.nickname?.trim() ? (
+            <Text style={[typography.body, { color: colors.inkSoft, marginTop: spacing.xs }]}>
+              {house.address.roadAddress}
+            </Text>
+          ) : null}
           <Text style={[typography.body, { color: colors.inkSoft, marginTop: spacing.xs }]}>
             {house.address.jibunAddress}
+            {house.address.detail ? ` ${house.address.detail}` : ''}
           </Text>
         </Card>
 
@@ -76,27 +85,45 @@ export function HouseDetailScreen({ route, navigation }: Props) {
           ) : null}
         </Card>
 
-        {(house.area || house.floor || house.rooms) && (
+        {(house.area ||
+          house.floor ||
+          house.rooms ||
+          house.roomType ||
+          house.floorType ||
+          house.direction) && (
           <Card>
             <Text style={typography.caption}>구조</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm }}>
+              {house.roomType ? <Pill text={roomTypeLabel(house.roomType) ?? ''} /> : null}
               {house.area ? <Pill text={`${house.area}평`} /> : null}
-              {house.floor ? <Pill text={`${house.floor}층`} /> : null}
+              {floorText ? <Pill text={floorText} /> : null}
               {house.rooms ? <Pill text={`방 ${house.rooms}`} /> : null}
               {house.bathrooms ? <Pill text={`욕실 ${house.bathrooms}`} /> : null}
+              {house.direction ? <Pill text={directionLabel(house.direction) ?? ''} /> : null}
             </View>
           </Card>
         )}
 
-        {presentRatings.length > 0 ? (
+        {presentConditions.length > 0 ? (
           <Card>
-            <Text style={typography.caption}>별점</Text>
-            {presentRatings.map((k) => (
-              <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm }}>
-                <Text style={typography.body}>{labelOf(k)}</Text>
-                <StarRating value={(house[k] as number) ?? 0} onChange={() => {}} />
-              </View>
-            ))}
+            <Text style={typography.caption}>컨디션</Text>
+            {presentConditions.map((k) => {
+              const lvl = normalizeConditionLevel(house[k] as number);
+              return (
+                <View
+                  key={k}
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Ionicons name={CONDITION_META[k].icon as never} size={16} color={conditionColor(lvl)} />
+                    <Text style={typography.body}>{CONDITION_META[k].label}</Text>
+                  </View>
+                  <Text style={[typography.bodyBold, { color: conditionColor(lvl) }]}>
+                    {conditionLabel(lvl)}
+                  </Text>
+                </View>
+              );
+            })}
           </Card>
         ) : null}
 
@@ -133,18 +160,11 @@ export function HouseDetailScreen({ route, navigation }: Props) {
   );
 }
 
-function labelOf(k: RatingKey): string {
-  const m: Record<RatingKey, string> = {
-    waterPressure: '수압',
-    sunlight: '햇빛',
-    noise: '소음',
-    insulation: '단열',
-    ventilation: '환기',
-    moisture: '곰팡이/누수',
-    neighborhood: '동네',
-    firstImpression: '첫인상',
-  };
-  return m[k];
+function floorLabel(h: House): string | null {
+  if (h.floorType === 'SEMI_BASEMENT') return '반지하';
+  if (h.floorType === 'ROOFTOP') return '옥탑';
+  if (h.floor != null) return h.totalFloor != null ? `${h.floor}/${h.totalFloor}층` : `${h.floor}층`;
+  return null;
 }
 
 function Pill({ text }: { text: string }) {
