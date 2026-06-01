@@ -133,5 +133,6 @@ jest.mock('react-native-calendars', () => {
         },
         React.createElement(Text, null, 'calendar'),
       ),
+    LocaleConfig: { locales: {}, defaultLocale: 'en' },
   };
 });
