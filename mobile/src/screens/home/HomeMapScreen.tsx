@@ -42,7 +42,6 @@ import {
   filterHousesByRegion,
   formatHousePrice,
   formatHousePriceShort,
-  getAverageRating,
   getDealTypeLabel,
   getHouseCoordinate,
   getHouseMeta,
@@ -68,7 +67,7 @@ type AreaBucket = 'UP_TO_5' | 'UP_TO_10' | 'UP_TO_15' | 'UP_TO_20' | 'OVER_20';
 type RoomBucket = 'STUDIO' | 'ONE_HALF' | 'TWO' | 'THREE_PLUS';
 type NumericRange = { min: number; max: number };
 type HomeViewMode = 'MAP' | 'LIST';
-type HomeSortMode = 'RECENT' | 'DISTANCE' | 'PRICE_ASC' | 'RATING_DESC';
+type HomeSortMode = 'RECENT' | 'DISTANCE' | 'PRICE_ASC';
 type FilterSheetSnap = 'PEEK' | 'HALF' | 'FULL';
 type HomeMarkerItem =
   | { type: 'house'; house: House; coordinate: MapCoordinate }
@@ -100,13 +99,13 @@ const PIN_WIDTH = 34; // 물방울 핀 너비
 const PIN_HEIGHT = 44; // 물방울 핀 높이(꼬리 포함)
 const CLUSTER_MARKER_SIZE = 46;
 const SELECTED_CALLOUT_HEIGHT = 50;
-const CALLOUT_TEXT_LEFT = 38; // 아이콘박스(좌6+24) + 간격8
+const CALLOUT_TEXT_LEFT = 42; // 아이콘박스(좌10 + 24) + 간격8 → 좌우 여백 균형
 const CURRENT_LOCATION_MARKER_SIZE = 44;
 
-// 선택 콜아웃 너비 — 아이콘 + 좌측정렬 2줄(가격 줄 기준)에 딱 맞게(야놀자식). 클램프.
+// 선택 콜아웃 너비 — 아이콘 + 좌측정렬 2줄(가격 줄 기준)에 딱 맞게(야놀자식). 좌10/우12 대칭 여백. 클램프.
 function calloutWidth(priceText: string): number {
-  const textW = Math.max(priceText.length * 8, 30);
-  return Math.min(Math.max(CALLOUT_TEXT_LEFT + textW + 14, 92), 188);
+  const textW = Math.max(Math.round(priceText.length * 7.2), 28);
+  return Math.min(Math.max(CALLOUT_TEXT_LEFT + textW + 12, 92), 184);
 }
 type TestableMarkerProps = ComponentProps<typeof NaverMapMarkerOverlay> & { testID?: string };
 const TestableNaverMapMarkerOverlay = NaverMapMarkerOverlay as ComponentType<TestableMarkerProps>;
@@ -161,7 +160,6 @@ const SORT_OPTIONS: { key: HomeSortMode; label: string; testID: string }[] = [
   { key: 'RECENT', label: '최근 본 순', testID: 'home-sort-recent' },
   { key: 'DISTANCE', label: '가까운 순', testID: 'home-sort-distance' },
   { key: 'PRICE_ASC', label: '가격 낮은 순', testID: 'home-sort-price-asc' },
-  { key: 'RATING_DESC', label: '평점 높은 순', testID: 'home-sort-rating' },
 ];
 
 export function HomeMapScreen({ navigation }: Props) {
@@ -945,7 +943,6 @@ function HomeFullListRow({
   onSelect: () => void;
   onOpen: () => void;
 }) {
-  const rating = getAverageRating(house);
   const visitedAt = new Date(house.createdAt);
   const visitedLabel = Number.isNaN(visitedAt.getTime())
     ? '기록'
@@ -969,7 +966,6 @@ function HomeFullListRow({
           <Text style={styles.fullListRowTitle} numberOfLines={1}>
             {getHouseTitle(house)}
           </Text>
-          {rating > 0 ? <Text style={styles.fullListRating}>★ {rating.toFixed(1)}</Text> : null}
         </View>
         <Text style={styles.fullListAddress} numberOfLines={1}>
           {getHouseSubtitle(house)}
@@ -1019,7 +1015,6 @@ function HomeHouseCard({
   onSelect: () => void;
   onOpen: () => void;
 }) {
-  const rating = getAverageRating(house);
   const visitedAt = new Date(house.createdAt);
   const visitedLabel = Number.isNaN(visitedAt.getTime())
     ? '방문'
@@ -1040,7 +1035,6 @@ function HomeHouseCard({
         <View style={styles.photoWindow} />
         <View style={styles.photoWindowAlt} />
         <Text style={styles.visitBadge}>{visitedLabel}</Text>
-        <Text style={styles.tagBadge}>{rating > 0 ? `평점 ${rating.toFixed(1)}` : '기록 중'}</Text>
       </View>
 
       <View style={styles.cardInfo}>
@@ -1576,8 +1570,6 @@ function sortHomeHouses(houses: House[], sortMode: HomeSortMode, baseCoordinate:
         return getDistanceScore(a, baseCoordinate) - getDistanceScore(b, baseCoordinate);
       case 'PRICE_ASC':
         return getPriceSortValue(a) - getPriceSortValue(b);
-      case 'RATING_DESC':
-        return getAverageRating(b) - getAverageRating(a);
       case 'RECENT':
       default:
         return b.createdAt.localeCompare(a.createdAt);
@@ -1879,16 +1871,16 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   // 흰 집 글리프 — 핀 루트의 직속 자식으로 원(상단 30px, 중심 x17/y15) 중앙에 절대배치.
-  // 지붕(14×6 삼각형) 위, 몸통(10×7 사각형) 아래로 집 실루엣.
+  // 지붕(16×7 삼각형) 위, 몸통(10×8 사각형) 아래로 또렷한 집 실루엣.
   pinHomeRoof: {
     position: 'absolute',
-    top: 9,
-    left: 10,
+    top: 8,
+    left: 9,
     width: 0,
     height: 0,
-    borderLeftWidth: 7,
-    borderRightWidth: 7,
-    borderBottomWidth: 6,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 7,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderBottomColor: homeColors.white,
@@ -1898,7 +1890,7 @@ const styles = StyleSheet.create({
     top: 15,
     left: 12,
     width: 10,
-    height: 7,
+    height: 8,
     backgroundColor: homeColors.white,
   },
   pinTail: {
@@ -1944,27 +1936,28 @@ const styles = StyleSheet.create({
   },
   calloutIconBox: {
     position: 'absolute',
-    left: 6,
+    left: 10,
     top: 9,
     width: 24,
     height: 24,
     borderRadius: 8,
     backgroundColor: homeColors.coral,
   },
+  // 흰 집(아이콘박스 중심 x22 기준) — 지붕(14×6) 위, 몸통(10×8) 아래.
   calloutHomeRoof: {
     position: 'absolute',
     top: 14,
-    left: 12,
+    left: 15,
     width: 0,
     height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
     borderBottomWidth: 6,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderBottomColor: homeColors.white,
   },
-  calloutHomeBody: { position: 'absolute', top: 20, left: 14, width: 8, height: 7, backgroundColor: homeColors.white },
+  calloutHomeBody: { position: 'absolute', top: 20, left: 17, width: 10, height: 8, backgroundColor: homeColors.white },
   calloutLabel: { position: 'absolute', left: CALLOUT_TEXT_LEFT, top: 7, fontSize: 10, fontWeight: '700', letterSpacing: -0.2 },
   calloutPriceText: {
     position: 'absolute',

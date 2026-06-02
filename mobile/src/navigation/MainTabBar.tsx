@@ -91,7 +91,9 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft,
   },
   item: { flex: 1, alignItems: 'center', gap: 5 },
-  centerItem: { alignItems: 'center', gap: 5, marginTop: -2 },
+  // 가운데 ＋집추가: 버튼(46)이 아이콘(23)보다 커서 라벨이 아래로 밀린다.
+  // 컬럼을 위로 끌어올려(버튼이 살짝 솟아오른 FAB 형태) "집 추가" 라벨을 다른 탭 라벨과 같은 높이로 맞춘다.
+  centerItem: { flex: 1, alignItems: 'center', gap: 5, marginTop: -22 },
   centerButton: {
     width: 46,
     height: 46,

@@ -3,7 +3,6 @@ import { House } from '@/types';
 import { colors, radii, spacing, typography } from '@/theme';
 import {
   formatHousePrice,
-  getAverageRating,
   getDealTypeLabel,
   getHouseCoordinate,
   getHouseMeta,
@@ -21,7 +20,6 @@ type Props = {
 };
 
 export function HouseRecordRow({ house, selected, onSelect, onOpen, testID }: Props) {
-  const rating = getAverageRating(house);
   const meta = getHouseMeta(house);
   const hasCoordinate = Boolean(getHouseCoordinate(house));
 
@@ -44,7 +42,6 @@ export function HouseRecordRow({ house, selected, onSelect, onOpen, testID }: Pr
           <Text style={styles.title} numberOfLines={1}>
             {getHouseTitle(house)}
           </Text>
-          {rating > 0 ? <Text style={styles.rating}>★ {rating.toFixed(1)}</Text> : null}
         </View>
 
         <Text style={styles.subtitle} numberOfLines={1}>
