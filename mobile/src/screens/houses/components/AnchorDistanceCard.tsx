@@ -5,7 +5,7 @@ import { House } from '@/types';
 import { colors, spacing, typography } from '@/theme';
 import { formatKm } from '@/screens/houses/houseMapUtils';
 import { useAnchorDistances } from '@/queries/anchorDistances.queries';
-import { ANCHOR_META } from '@/screens/houses/anchorMeta';
+import { ANCHOR_META, TRANSPORT_META } from '@/screens/houses/anchorMeta';
 
 /**
  * 집 ↔ 등록된 거점(직장/학교)의 거리 스탯.
@@ -29,12 +29,17 @@ export function AnchorDistanceCard({ house }: { house: House }) {
         <View style={styles.stats}>
           {distances.map((d) => {
             const meta = ANCHOR_META[d.anchorType];
+            const transportLabel = TRANSPORT_META[d.mode ?? 'CAR'].label;
             const sub =
               d.source === 'driving'
                 ? d.durationMin != null
                   ? `차 ${d.durationMin}분`
                   : '도로 거리'
-                : '직선거리';
+                : d.source === 'estimate'
+                  ? d.durationMin != null
+                    ? `${transportLabel} ${d.durationMin}분`
+                    : transportLabel
+                  : '직선거리';
             return (
               <View key={d.anchorType} testID={`anchor-distance-${d.anchorType}`} style={styles.stat}>
                 <View style={styles.statIcon}>

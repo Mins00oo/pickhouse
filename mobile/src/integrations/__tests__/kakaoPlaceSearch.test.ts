@@ -19,11 +19,18 @@ afterEach(() => {
 });
 
 describe('searchPlaces', () => {
-  it('parses keyword results (x=lng, y=lat) and sends KakaoAK header', async () => {
+  it('parses keyword results (x=lng, y=lat), the category leaf, and sends KakaoAK header', async () => {
     const fetchMock = mockFetch({
       json: {
         documents: [
-          { place_name: '연세대학교', road_address_name: '서울 서대문구 연세로 50', address_name: '신촌동 134', x: '126.9387', y: '37.5658' },
+          {
+            place_name: '연세대학교',
+            category_name: '교육,학문 > 학교 > 대학교',
+            road_address_name: '서울 서대문구 연세로 50',
+            address_name: '신촌동 134',
+            x: '126.9387',
+            y: '37.5658',
+          },
         ],
       },
     });
@@ -35,11 +42,28 @@ describe('searchPlaces', () => {
         addressName: '신촌동 134',
         latitude: 37.5658,
         longitude: 126.9387,
+        category: '대학교', // category_name 마지막 세그먼트
       },
     ]);
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toContain('dapi.kakao.com/v2/local/search/keyword.json');
     expect((init as { headers: Record<string, string> }).headers.Authorization).toBe('KakaoAK test-key');
+  });
+
+  it('sorts by distance from an origin and parses the distance in meters', async () => {
+    const fetchMock = mockFetch({
+      json: {
+        documents: [
+          { place_name: '회사', road_address_name: '도로명', address_name: '지번', x: '127.0', y: '37.5', distance: '12400' },
+        ],
+      },
+    });
+    const results = await searchPlaces('회사', 'test-key', { latitude: 37.4, longitude: 127.1 });
+    expect(results[0]?.distanceM).toBe(12400);
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('x=127.1');
+    expect(url).toContain('y=37.4');
+    expect(url).toContain('sort=distance');
   });
 
   it('skips documents with non-finite coordinates', async () => {
