@@ -33,30 +33,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
 import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
+import { useHouseCommute, type PrimaryAnchors } from '@/queries/anchorDistances.queries';
 import { SAMPLE_HOUSES } from '@/screens/houses/houseSampleData';
 import {
   DEFAULT_MAP_CENTER,
+  deriveCommuteMode,
   filterHousesByKeyword,
   filterHousesByRegion,
-  formatDepositShort,
   formatHousePrice,
-  getAnchorCoordinate,
+  formatHousePriceShort,
   getAverageRating,
   getDealTypeLabel,
   getHouseCoordinate,
   getHouseMeta,
   getHouseSubtitle,
   getHouseTitle,
+  pickPrimaryAnchors,
   type MapCoordinate,
   type MapRegion,
 } from '@/screens/houses/houseMapUtils';
-import { ANCHOR_META } from '@/screens/houses/anchorMeta';
-import { AnchorPlacesSheet } from '@/screens/home/components/AnchorPlacesSheet';
-import { AnchorNudge } from '@/screens/home/components/AnchorNudge';
-import { radii, spacing, typography } from '@/theme';
-import { AnchorType, House } from '@/types';
+import { conditionColor, radii, spacing, typography } from '@/theme';
+import { House } from '@/types';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
+type Props = BottomTabScreenProps<MainTabParamList, 'Map'>;
 type CameraIdleParams = {
   latitude: number;
   longitude: number;
@@ -95,21 +94,25 @@ const CARD_WIDTH = 320;
 const CARD_GAP = 10;
 const CARD_SNAP_INTERVAL = CARD_WIDTH + CARD_GAP;
 const INDIVIDUAL_MARKER_MIN_ZOOM = 13;
-const SELECTED_MARKER_WIDTH = 148;
-const SELECTED_MARKER_HEIGHT = 34;
-const ICON_MARKER_SIZE = 36;
-const CLUSTER_MARKER_SIZE = 40;
+// 야놀자식 물방울 핀(coral) + 선택 시 가격 알약. 모두 RN 도형 children 으로 그려
+// iOS New Arch 의 텍스트 글리프 캡처 누락 문제를 피하고, 가격/카운트 텍스트만 네이티브 caption 으로 얹는다.
+const PIN_WIDTH = 34; // 물방울 핀 너비
+const PIN_HEIGHT = 44; // 물방울 핀 높이(꼬리 포함)
+const CLUSTER_MARKER_SIZE = 46;
+const SELECTED_CALLOUT_HEIGHT = 50;
+const CALLOUT_TEXT_LEFT = 38; // 아이콘박스(좌6+24) + 간격8
 const CURRENT_LOCATION_MARKER_SIZE = 44;
+
+// 선택 콜아웃 너비 — 아이콘 + 좌측정렬 2줄(가격 줄 기준)에 딱 맞게(야놀자식). 클램프.
+function calloutWidth(priceText: string): number {
+  const textW = Math.max(priceText.length * 8, 30);
+  return Math.min(Math.max(CALLOUT_TEXT_LEFT + textW + 14, 92), 188);
+}
 type TestableMarkerProps = ComponentProps<typeof NaverMapMarkerOverlay> & { testID?: string };
 const TestableNaverMapMarkerOverlay = NaverMapMarkerOverlay as ComponentType<TestableMarkerProps>;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const HOUSE_MARKER_IMAGE = require('../../../assets/map-markers/marker-house.png');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const CLUSTER_MARKER_IMAGE = require('../../../assets/map-markers/marker-cluster.png');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const CURRENT_LOCATION_MARKER_IMAGE = require('../../../assets/map-markers/marker-current-location.png');
 
-type AnchorMarker = { anchorType: AnchorType; coordinate: MapCoordinate };
 // Phase 2 스캐폴드: 네이버 커스텀 지도 스타일. 값이 있을 때만 적용한다.
 // customStyleId 는 네이티브에 연결되므로 최초 활성화 시 EAS 재빌드가 한 번 필요하다.
 const NAVER_MAP_STYLE_ID = process.env.EXPO_PUBLIC_NAVER_MAP_STYLE_ID ?? '';
@@ -177,22 +180,14 @@ export function HomeMapScreen({ navigation }: Props) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [homeFilter, setHomeFilter] = useState<HomeFilterState>(DEFAULT_HOME_FILTER);
   const [viewMode, setViewMode] = useState<HomeViewMode>('MAP');
+  const [mapType, setMapType] = useState<'Basic' | 'Satellite'>('Basic');
   const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
   const [sortMode, setSortMode] = useState<HomeSortMode>('RECENT');
   const [sortOpen, setSortOpen] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const { data: anchorPlaces = [] } = useAnchorPlaces();
-  const [anchorSheetOpen, setAnchorSheetOpen] = useState(false);
-  const [nudgeDismissed, setNudgeDismissed] = useState(false);
-
-  const anchorMarkers = useMemo<AnchorMarker[]>(
-    () =>
-      anchorPlaces
-        .map((a) => ({ anchorType: a.anchorType, coordinate: getAnchorCoordinate(a) }))
-        .filter((m): m is AnchorMarker => m.coordinate !== null),
-    [anchorPlaces],
-  );
-  const showAnchorNudge = anchorPlaces.length === 0 && !nudgeDismissed;
+  const primaryAnchors = useMemo(() => pickPrimaryAnchors(anchorPlaces), [anchorPlaces]);
+  const commuteMode = useMemo(() => deriveCommuteMode(anchorPlaces), [anchorPlaces]);
 
   const baseVisibleHouses = useMemo(() => {
     const inViewport = filterHousesByRegion(houses, viewportRegion);
@@ -310,6 +305,13 @@ export function HomeMapScreen({ navigation }: Props) {
     rootNavigation.navigate('HouseInput', undefined);
   };
 
+  const openPlaces = () => {
+    const rootNavigation =
+      navigation.getParent<NavigationProp<HouseStackParamList>>() ??
+      (navigation as unknown as NavigationProp<HouseStackParamList>);
+    rootNavigation.navigate('Places');
+  };
+
   const handleSelectHouseFromMarker = useCallback((houseId: string) => {
     // 시트는 고정 높이라 스냅 이동이 필요 없다. 캐러셀이 선택된 카드로 자동 스크롤한다.
     setActiveHouseId(houseId);
@@ -325,7 +327,7 @@ export function HomeMapScreen({ navigation }: Props) {
     sheetRef.current?.snapToIndex(0);
   };
 
-  const sheetFixedHeight = SHEET_BASE_HEIGHT + insets.bottom;
+  const sheetFixedHeight = SHEET_BASE_HEIGHT + insets.bottom + (commuteMode === 'none' ? 52 : 0);
   const peekSheetHeight = sheetFixedHeight;
   const mapFloatingBottom = peekSheetHeight + 14;
   const listToggleBottom = viewMode === 'MAP' ? peekSheetHeight + 14 : 16 + insets.bottom;
@@ -339,7 +341,7 @@ export function HomeMapScreen({ navigation }: Props) {
         style={StyleSheet.absoluteFill}
         initialCamera={isSampleMode ? SAMPLE_INITIAL_CAMERA : INITIAL_CAMERA}
         animationDuration={260}
-        mapType="Basic"
+        mapType={mapType}
         {...(NAVER_MAP_STYLE_ID
           ? {
               customStyleId: NAVER_MAP_STYLE_ID,
@@ -365,7 +367,6 @@ export function HomeMapScreen({ navigation }: Props) {
       >
         <HomeNativeMarkers
           markerItems={markerItems}
-          anchorMarkers={anchorMarkers}
           selectedHouseId={activeHouse?.id ?? null}
           userLocation={userLocation}
           onSelectHouse={handleSelectHouseFromMarker}
@@ -393,13 +394,13 @@ export function HomeMapScreen({ navigation }: Props) {
       {viewMode === 'MAP' ? (
         <View pointerEvents="box-none" style={[styles.mapTools, { bottom: mapFloatingBottom }]}>
           <Pressable
-            testID="home-add-house-button"
+            testID="home-layers-button"
             accessibilityRole="button"
-            accessibilityLabel="집 기록 추가"
-            onPress={openHouseInput}
-            style={[styles.mapToolButton, styles.addHouseButton]}
+            accessibilityLabel="지도 종류 전환"
+            onPress={() => setMapType((current) => (current === 'Basic' ? 'Satellite' : 'Basic'))}
+            style={styles.mapToolButton}
           >
-            <Ionicons name="add" size={25} color={homeColors.white} />
+            <Ionicons name="layers-outline" size={18} color={homeColors.ink70} />
           </Pressable>
           <Pressable
             testID="home-current-location-button"
@@ -410,24 +411,6 @@ export function HomeMapScreen({ navigation }: Props) {
           >
             <Ionicons name="navigate-outline" size={18} color={homeColors.ink70} />
           </Pressable>
-          <Pressable
-            testID="home-anchor-button"
-            accessibilityRole="button"
-            accessibilityLabel="내 직장·학교 등록"
-            onPress={() => setAnchorSheetOpen(true)}
-            style={styles.mapToolButton}
-          >
-            <Ionicons name="briefcase-outline" size={18} color={homeColors.ink70} />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {viewMode === 'MAP' && showAnchorNudge ? (
-        <View style={[styles.anchorNudgeWrap, { top: insets.top + 64 }]} pointerEvents="box-none">
-          <AnchorNudge
-            onPress={() => setAnchorSheetOpen(true)}
-            onDismiss={() => setNudgeDismissed(true)}
-          />
         </View>
       ) : null}
 
@@ -451,6 +434,9 @@ export function HomeMapScreen({ navigation }: Props) {
           sheetRef={sheetRef}
           sheetHeight={sheetFixedHeight}
           bottomInset={insets.bottom}
+          primaryAnchors={primaryAnchors}
+          commuteMode={commuteMode}
+          onRegisterAnchor={openPlaces}
           onSelectHouse={setActiveHouseId}
           onOpenHouse={openHouseDetail}
           onCreateHouse={openHouseInput}
@@ -496,22 +482,18 @@ export function HomeMapScreen({ navigation }: Props) {
           onClose={() => setFilterOpen(false)}
         />
       ) : null}
-
-      {anchorSheetOpen ? <AnchorPlacesSheet onClose={() => setAnchorSheetOpen(false)} /> : null}
     </View>
   );
 }
 
 function HomeNativeMarkers({
   markerItems,
-  anchorMarkers,
   selectedHouseId,
   userLocation,
   onSelectHouse,
   onSelectCluster,
 }: {
   markerItems: HomeMarkerItem[];
-  anchorMarkers: AnchorMarker[];
   selectedHouseId: string | null;
   userLocation: MapCoordinate | null;
   onSelectHouse: (houseId: string) => void;
@@ -519,30 +501,9 @@ function HomeNativeMarkers({
 }) {
   return (
     <>
-      {anchorMarkers.map((anchor) => (
-        <TestableNaverMapMarkerOverlay
-          key={`anchor-${anchor.anchorType}`}
-          testID={`home-anchor-marker-${anchor.anchorType}`}
-          latitude={anchor.coordinate.latitude}
-          longitude={anchor.coordinate.longitude}
-          width={ICON_MARKER_SIZE}
-          height={ICON_MARKER_SIZE}
-          anchor={{ x: 0.5, y: 0.5 }}
-          image={HOUSE_MARKER_IMAGE}
-          isForceShowIcon
-          zIndex={90}
-          caption={{
-            text: `${ANCHOR_META[anchor.anchorType].emoji} ${ANCHOR_META[anchor.anchorType].label}`,
-            align: 'Top',
-            color: homeColors.primary,
-            haloColor: homeColors.white,
-            textSize: 12,
-          }}
-        />
-      ))}
-
       {markerItems.map((item) => {
         if (item.type === 'cluster') {
+          // 줌아웃: 코랄 물방울 핀 + 카운트(숫자) 네이티브 caption.
           return (
             <TestableNaverMapMarkerOverlay
               key={item.id}
@@ -552,69 +513,69 @@ function HomeNativeMarkers({
               width={CLUSTER_MARKER_SIZE}
               height={CLUSTER_MARKER_SIZE}
               anchor={{ x: 0.5, y: 0.5 }}
-              image={CLUSTER_MARKER_IMAGE}
               isForceShowIcon
               zIndex={80}
               caption={{
                 text: String(item.count),
                 align: 'Center',
-                color: homeColors.primary,
+                color: homeColors.white,
                 haloColor: 'transparent',
                 textSize: 15,
                 requestedWidth: CLUSTER_MARKER_SIZE,
               }}
               onTap={() => onSelectCluster(item)}
-            />
+            >
+              <ClusterPinShape />
+            </TestableNaverMapMarkerOverlay>
           );
         }
 
         const selected = item.house.id === selectedHouseId;
         if (selected) {
-          // 선택된 집은 가격 말풍선으로 표시한다.
-          // iOS New Arch 에서 커스텀 뷰 children 은 마운트 직후 layer 스냅샷으로 캡처되는데,
-          // 배경/테두리(레이어 속성)는 캡처되지만 UILabel·폰트 글리프(텍스트)는 비동기 레이아웃이라
-          // 캡처에서 누락된다. 따라서 알약 "배경"만 children 으로 그리고, "텍스트"는 네이티브
-          // caption(클러스터 카운트와 동일한 채널, 항상 렌더됨)으로 알약 중앙에 얹는다.
-          const markerLabel = `${getMarkerDealTypeLabel(item.house)} ${formatMarkerPrice(item.house)}`;
+          // 야놀자식 콜아웃: 흰 알약 + 코랄 집 아이콘 + 좌측정렬 2줄(거래유형 / 가격) + 꼬리.
+          // 모든 요소를 root 의 "직속 자식"으로 절대배치(라이브러리 문서 예시 구조) → 텍스트도 렌더된다.
+          const isJeonse = item.house.dealType === 'JEONSE';
+          const dealLabel = getMarkerDealTypeLabel(item.house);
+          const priceText = formatHousePriceShort(item.house).replace(/^전세\s*/, '');
+          const cw = calloutWidth(priceText);
           return (
             <TestableNaverMapMarkerOverlay
               key={item.house.id}
               testID={`home-house-marker-${item.house.id}`}
               latitude={item.coordinate.latitude}
               longitude={item.coordinate.longitude}
-              width={SELECTED_MARKER_WIDTH}
-              height={SELECTED_MARKER_HEIGHT}
+              width={cw}
+              height={SELECTED_CALLOUT_HEIGHT}
               anchor={{ x: 0.5, y: 1 }}
               isForceShowIcon
               zIndex={120}
-              caption={{
-                text: markerLabel,
-                align: 'Center',
-                color: homeColors.ink,
-                haloColor: 'transparent',
-                textSize: 12,
-                requestedWidth: 0,
-              }}
               onTap={() => onSelectHouse(item.house.id)}
             >
-              <SelectedHouseMarker house={item.house} />
+              <SelectedCallout
+                width={cw}
+                dealLabel={dealLabel}
+                priceText={priceText}
+                labelColor={isJeonse ? homeColors.primary : homeColors.coral}
+              />
             </TestableNaverMapMarkerOverlay>
           );
         }
+        // 미선택: 코랄 물방울 하우스 핀(도형).
         return (
           <TestableNaverMapMarkerOverlay
             key={item.house.id}
             testID={`home-house-marker-${item.house.id}`}
             latitude={item.coordinate.latitude}
             longitude={item.coordinate.longitude}
-            width={ICON_MARKER_SIZE}
-            height={ICON_MARKER_SIZE}
-            anchor={{ x: 0.5, y: 0.5 }}
-            image={HOUSE_MARKER_IMAGE}
+            width={PIN_WIDTH}
+            height={PIN_HEIGHT}
+            anchor={{ x: 0.5, y: 1 }}
             isForceShowIcon
             zIndex={60}
             onTap={() => onSelectHouse(item.house.id)}
-          />
+          >
+            <HousePinShape />
+          </TestableNaverMapMarkerOverlay>
         );
       })}
 
@@ -649,6 +610,7 @@ function HomeSearchFilterBar({
   return (
     <View testID="home-top-bar" style={styles.topBar}>
       <View style={styles.searchPill}>
+        <Ionicons name="menu" size={18} color={homeColors.ink70} style={styles.searchMenuIcon} />
         <TextInput
           value={query}
           onChangeText={onQueryChange}
@@ -690,6 +652,9 @@ function HomeCarousel({
   sheetRef,
   sheetHeight,
   bottomInset,
+  primaryAnchors,
+  commuteMode,
+  onRegisterAnchor,
   onSelectHouse,
   onOpenHouse,
   onCreateHouse,
@@ -704,6 +669,9 @@ function HomeCarousel({
   sheetRef: RefObject<ComponentRef<typeof BottomSheet>>;
   sheetHeight: number;
   bottomInset: number;
+  primaryAnchors: PrimaryAnchors;
+  commuteMode: 'none' | 'work' | 'school' | 'both';
+  onRegisterAnchor: () => void;
   onSelectHouse: (houseId: string) => void;
   onOpenHouse: (houseId: string) => void;
   onCreateHouse: () => void;
@@ -784,6 +752,25 @@ function HomeCarousel({
           </View>
         ) : null}
 
+        {commuteMode === 'none' ? (
+          <View style={styles.commuteBanner}>
+            <View style={styles.commuteBannerIcon}>
+              <Ionicons name="navigate" size={14} color={homeColors.primary} />
+            </View>
+            <Text style={styles.commuteBannerText} numberOfLines={1}>
+              직장·학교 등록하고 <Text style={styles.commuteBannerStrong}>통근시간</Text> 보기
+            </Text>
+            <Pressable
+              testID="home-commute-register"
+              accessibilityRole="button"
+              onPress={onRegisterAnchor}
+              style={styles.commuteBannerBtn}
+            >
+              <Text style={styles.commuteBannerBtnText}>등록</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {houses.length > 0 ? (
           <ScrollView
             ref={carouselRef}
@@ -801,6 +788,8 @@ function HomeCarousel({
                 key={house.id}
                 house={house}
                 active={house.id === selectedHouseId}
+                primaryAnchors={primaryAnchors}
+                commuteMode={commuteMode}
                 onSelect={() => onSelectHouse(house.id)}
                 onOpen={() => onOpenHouse(house.id)}
               />
@@ -1006,14 +995,27 @@ function HomeFullListRow({
   );
 }
 
+// 카드 하단 컨디션 점 — 햇빛/수압/곰팡이/방음/환기 (좋음=green·보통=amber·나쁨=red).
+const CARD_CHECKS: { key: keyof House; icon: string }[] = [
+  { key: 'sunlight', icon: 'sunny' },
+  { key: 'waterPressure', icon: 'water' },
+  { key: 'moisture', icon: 'bug' },
+  { key: 'noise', icon: 'volume-high' },
+  { key: 'ventilation', icon: 'sync' },
+];
+
 function HomeHouseCard({
   house,
   active,
+  primaryAnchors,
+  commuteMode,
   onSelect,
   onOpen,
 }: {
   house: House;
   active: boolean;
+  primaryAnchors: PrimaryAnchors;
+  commuteMode: 'none' | 'work' | 'school' | 'both';
   onSelect: () => void;
   onOpen: () => void;
 }) {
@@ -1022,6 +1024,9 @@ function HomeHouseCard({
   const visitedLabel = Number.isNaN(visitedAt.getTime())
     ? '방문'
     : `${visitedAt.getMonth() + 1}/${visitedAt.getDate()} 방문`;
+  const commute = useHouseCommute(house, primaryAnchors);
+  const showWork = (commuteMode === 'work' || commuteMode === 'both') && typeof commute.work === 'number';
+  const showSchool = (commuteMode === 'school' || commuteMode === 'both') && typeof commute.school === 'number';
 
   return (
     <Pressable
@@ -1043,7 +1048,7 @@ function HomeHouseCard({
           <Text style={[styles.dealBadge, house.dealType === 'JEONSE' && styles.jeonseBadge]}>
             {getDealTypeLabel(house)}
           </Text>
-          <Ionicons name="bookmark-outline" size={14} color={homeColors.muted} />
+          <Ionicons name="bookmark-outline" size={14} color={homeColors.muted} style={styles.cardBookmark} />
         </View>
 
         <Text style={styles.cardTitle} numberOfLines={1}>
@@ -1052,24 +1057,40 @@ function HomeHouseCard({
         <Text style={styles.cardSubtitle} numberOfLines={1}>
           {getHouseSubtitle(house)}
         </Text>
-        <Text style={styles.cardPrice}>{formatHousePrice(house)}</Text>
-
-        <View style={styles.miniChips}>
-          {getHouseMeta(house)
-            .split(' · ')
-            .filter(Boolean)
-            .slice(0, 3)
-            .map((item) => (
-              <Text key={item} style={styles.miniChip}>
-                {item}
-              </Text>
-            ))}
+        <View style={styles.cardPriceRow}>
+          <Text style={styles.cardPrice} numberOfLines={1}>
+            {formatHousePrice(house)}
+          </Text>
+          {house.dealType !== 'JEONSE' && typeof house.maintenanceFee === 'number' && house.maintenanceFee > 0 ? (
+            <Text style={styles.cardMgmt}>관리비 {house.maintenanceFee}만</Text>
+          ) : null}
         </View>
 
-        <View style={styles.cardActions}>
-          <Pressable onPress={onOpen} style={styles.detailPill}>
-            <Text style={styles.detailPillText}>상세 보기</Text>
-          </Pressable>
+        <View style={styles.cardBottomRow}>
+          <View style={styles.checkDots}>
+            {CARD_CHECKS.map(({ key, icon }) => {
+              const value = house[key];
+              const color =
+                typeof value === 'number' ? conditionColor(value as 1 | 2 | 3) : homeColors.borderSoft;
+              return <Ionicons key={key} name={icon as never} size={13} color={color} />;
+            })}
+          </View>
+          {showWork || showSchool ? (
+            <View style={styles.commuteGroup}>
+              {showWork ? (
+                <View style={styles.commuteItem}>
+                  <Ionicons name="briefcase" size={11} color={homeColors.primary} />
+                  <Text style={[styles.commuteText, { color: homeColors.primary }]}>{commute.work}분</Text>
+                </View>
+              ) : null}
+              {showSchool ? (
+                <View style={styles.commuteItem}>
+                  <Ionicons name="school" size={11} color={homeColors.school} />
+                  <Text style={[styles.commuteText, { color: homeColors.school }]}>{commute.school}분</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -1464,18 +1485,49 @@ function getClusterCellSize(zoomLevel: number): number {
   return 0.02;
 }
 
-function SelectedHouseMarker({ house }: { house: House }) {
-  const dealLabel = getMarkerDealTypeLabel(house);
-  const priceText = formatMarkerPrice(house);
+// 미선택 하우스 핀 — 코랄 물방울(원 + 꼬리) + 흰 집 글리프.
+// iOS New Arch 는 collapsable=false 가 아닌 View 를 평탄화해 캡처에서 누락하므로(라이브러리 문서),
+// 마커 안의 "모든" View 에 collapsable={false} 를 명시한다.
+function HousePinShape() {
   return (
-    // children 에는 "배경(흰 알약 + 코랄 테두리)"만 둔다. 텍스트는 네이티브 caption 으로 그린다.
-    // (iOS New Arch 의 children 캡처는 레이어 배경/테두리만 안정적으로 잡고 텍스트는 누락하기 때문)
-    // key 에 모양 의존성을 담아 가격이 바뀌면 캡처가 갱신되도록 한다(라이브러리 권장).
-    <View
-      key={`${dealLabel}/${priceText}/${SELECTED_MARKER_WIDTH}x${SELECTED_MARKER_HEIGHT}`}
-      collapsable={false}
-      style={styles.selectedPriceMarkerPill}
-    />
+    <View collapsable={false} style={styles.pinWrap}>
+      <View collapsable={false} style={styles.pinCircle} />
+      <View collapsable={false} style={styles.pinHomeRoof} />
+      <View collapsable={false} style={styles.pinHomeBody} />
+      <View collapsable={false} style={styles.pinTail} />
+    </View>
+  );
+}
+
+// 클러스터 핀 — 코랄 원(카운트 텍스트는 네이티브 caption).
+function ClusterPinShape() {
+  return <View collapsable={false} style={styles.clusterCircle} />;
+}
+
+// 야놀자식 선택 콜아웃 — 흰 알약 + 코랄 집 아이콘 + 좌측정렬 2줄(거래유형/가격) + 코랄 꼬리.
+// iOS 스냅샷은 루트의 "직속 자식"만 안정적으로 그리므로(라이브러리 문서 예시 구조),
+// 배경·아이콘·꼬리(도형)와 2개의 텍스트를 모두 root 의 직속 자식으로 절대배치한다.
+function SelectedCallout({
+  width,
+  dealLabel,
+  priceText,
+  labelColor,
+}: {
+  width: number;
+  dealLabel: string;
+  priceText: string;
+  labelColor: string;
+}) {
+  return (
+    <View key={`${dealLabel}/${priceText}/${width}`} collapsable={false} style={[styles.calloutRoot, { width }]}>
+      <View collapsable={false} style={[styles.calloutPillBg, { width }]} />
+      <View collapsable={false} style={styles.calloutIconBox} />
+      <View collapsable={false} style={styles.calloutHomeRoof} />
+      <View collapsable={false} style={styles.calloutHomeBody} />
+      <Text style={[styles.calloutLabel, { color: labelColor }]}>{dealLabel}</Text>
+      <Text style={styles.calloutPriceText}>{priceText}</Text>
+      <View collapsable={false} style={[styles.calloutTail, { left: width / 2 - 7 }]} />
+    </View>
   );
 }
 
@@ -1483,14 +1535,6 @@ function getMarkerDealTypeLabel(house: House): string {
   if (house.dealType === 'JEONSE') return '전세';
   if (house.dealType === 'BAN_JEONSE') return '반전세';
   return '월세';
-}
-
-function formatMarkerPrice(house: House): string {
-  if (house.dealType === 'JEONSE') return formatDepositShort(house.deposit);
-
-  const deposit = house.deposit >= 10000 ? formatDepositShort(house.deposit) : house.deposit.toLocaleString('ko-KR');
-  const rent = (house.rent ?? 0).toLocaleString('ko-KR');
-  return `${deposit} / ${rent}`;
 }
 
 function getAverageCoordinate(houses: House[]): MapCoordinate | null {
@@ -1642,6 +1686,7 @@ const homeColors = {
   surface: '#FAFAF6',
   white: '#FFFFFF',
   coral: '#E8754A',
+  school: '#7B5FCC',
 };
 
 const styles = StyleSheet.create({
@@ -1668,7 +1713,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingLeft: spacing.lg,
+    paddingLeft: 14,
     paddingRight: 6,
     borderRadius: 24,
     backgroundColor: homeColors.white,
@@ -1680,6 +1725,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
+  searchMenuIcon: { marginRight: 2 },
   searchInput: {
     flex: 1,
     minWidth: 0,
@@ -1818,49 +1864,128 @@ const styles = StyleSheet.create({
     zIndex: 2,
     elevation: 2,
   },
-  overlayClusterMarker: {
-    position: 'absolute',
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 28,
-    backgroundColor: homeColors.white,
-    borderWidth: 2,
-    borderColor: homeColors.primary,
+  pinWrap: { width: PIN_WIDTH, height: PIN_HEIGHT, alignItems: 'center' },
+  pinCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: homeColors.coral,
+    borderWidth: 2.5,
+    borderColor: homeColors.white,
     shadowColor: '#000',
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 5,
+  },
+  // 흰 집 글리프 — 핀 루트의 직속 자식으로 원(상단 30px, 중심 x17/y15) 중앙에 절대배치.
+  // 지붕(14×6 삼각형) 위, 몸통(10×7 사각형) 아래로 집 실루엣.
+  pinHomeRoof: {
+    position: 'absolute',
+    top: 9,
+    left: 10,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderBottomWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: homeColors.white,
+  },
+  pinHomeBody: {
+    position: 'absolute',
+    top: 15,
+    left: 12,
+    width: 10,
+    height: 7,
+    backgroundColor: homeColors.white,
+  },
+  pinTail: {
+    width: 0,
+    height: 0,
+    marginTop: -3,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 9,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: homeColors.coral,
+  },
+  clusterCircle: {
+    width: CLUSTER_MARKER_SIZE,
+    height: CLUSTER_MARKER_SIZE,
+    borderRadius: CLUSTER_MARKER_SIZE / 2,
+    backgroundColor: homeColors.coral,
+    borderWidth: 2.5,
+    borderColor: homeColors.white,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
+  },
+  // 콜아웃 — 모든 요소가 root 의 직속 자식(절대배치). width 는 내용에 맞춰 동적(인라인).
+  calloutRoot: { height: SELECTED_CALLOUT_HEIGHT },
+  calloutPillBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: homeColors.white,
+    borderWidth: 1.5,
+    borderColor: homeColors.coral,
+    shadowColor: '#0E1A14',
+    shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 8,
   },
-  selectedPriceMarkerPill: {
-    width: SELECTED_MARKER_WIDTH,
-    height: SELECTED_MARKER_HEIGHT,
-    borderRadius: SELECTED_MARKER_HEIGHT / 2,
-    backgroundColor: homeColors.white,
-    borderColor: homeColors.coral,
-    borderWidth: 1.5,
-    shadowColor: '#0E1A14',
-    shadowOpacity: 0.2,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 8,
+  calloutIconBox: {
+    position: 'absolute',
+    left: 6,
+    top: 9,
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: homeColors.coral,
   },
-  iconMarker: {
-    width: ICON_MARKER_SIZE,
-    height: ICON_MARKER_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 19,
-    backgroundColor: homeColors.white,
-    borderWidth: 1.5,
-    borderColor: homeColors.borderSoft,
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 7,
+  calloutHomeRoof: {
+    position: 'absolute',
+    top: 14,
+    left: 12,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: homeColors.white,
+  },
+  calloutHomeBody: { position: 'absolute', top: 20, left: 14, width: 8, height: 7, backgroundColor: homeColors.white },
+  calloutLabel: { position: 'absolute', left: CALLOUT_TEXT_LEFT, top: 7, fontSize: 10, fontWeight: '700', letterSpacing: -0.2 },
+  calloutPriceText: {
+    position: 'absolute',
+    left: CALLOUT_TEXT_LEFT,
+    top: 19,
+    fontSize: 14,
+    fontWeight: '800',
+    color: homeColors.ink,
+    letterSpacing: -0.3,
+  },
+  calloutTail: {
+    position: 'absolute',
+    top: 41,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: homeColors.coral,
   },
   currentLocationMarker: {
     position: 'absolute',
@@ -2287,12 +2412,58 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  cardBookmark: { marginLeft: 'auto' },
+  cardPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: spacing.sm, marginBottom: 'auto' },
   cardPrice: {
-    marginTop: spacing.sm,
     color: homeColors.ink,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
+    letterSpacing: -0.4,
   },
+  cardMgmt: { color: homeColors.muted, fontSize: 11, fontWeight: '500' },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: homeColors.borderSoft,
+  },
+  checkDots: { flexDirection: 'row', gap: 7 },
+  commuteGroup: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  commuteItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  commuteText: { fontSize: 11, fontWeight: '700', letterSpacing: -0.2 },
+  commuteBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingVertical: 9,
+    paddingLeft: 12,
+    paddingRight: 10,
+    borderRadius: 13,
+    backgroundColor: homeColors.white,
+    borderWidth: 1,
+    borderColor: homeColors.borderSoft,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  commuteBannerIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: homeColors.primarySoft,
+  },
+  commuteBannerText: { flex: 1, fontSize: 12, fontWeight: '600', color: homeColors.ink70, letterSpacing: -0.2 },
+  commuteBannerStrong: { fontWeight: '800', color: homeColors.ink },
+  commuteBannerBtn: { height: 30, paddingHorizontal: 13, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: homeColors.ink },
+  commuteBannerBtnText: { fontSize: 12, fontWeight: '700', color: homeColors.white },
   miniChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
