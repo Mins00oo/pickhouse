@@ -141,4 +141,14 @@ export const migrations: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_anchor_user_type ON anchor_places(user_id, anchor_type);
     `,
   },
+  {
+    // 거점 모델 확장: 타입당 1개 → 여러 개 허용(직장/학교/기타). 이동수단 + 주 통근지 추가.
+    // 기존 행은 transport NULL(읽을 때 기본 CAR), is_primary 0.
+    version: 4,
+    sql: `
+      ALTER TABLE anchor_places ADD COLUMN transport TEXT;
+      ALTER TABLE anchor_places ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0;
+      DROP INDEX IF EXISTS idx_anchor_user_type;
+    `,
+  },
 ];

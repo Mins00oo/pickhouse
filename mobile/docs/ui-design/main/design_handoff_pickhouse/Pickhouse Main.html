@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pickhouse — 메인 화면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"/>
+<style>
+  html, body { margin: 0; padding: 0; font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #F4F1EA; }
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  /* hide scrollbar in carousel */
+  *::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="pickhouse-shared.jsx"></script>
+<script type="text/babel" src="pickhouse-main.jsx"></script>
+<script type="text/babel" src="pickhouse-places.jsx"></script>
+
+<script type="text/babel">
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+  const { MainScreen } = window;
+  const { PlacesList, AddPlace, PlacesEmpty, MyPage } = window;
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection
+          id="main"
+          title="메인 화면"
+          subtitle="카드를 좌우로 스와이프하면 지도의 핀이 따라 이동합니다 — 아래 카드를 옆으로 끌어보세요"
+        >
+          <DCArtboard id="m1" label="① 청파동 선택" width={402} height={874}>
+            <MainScreen initialSelected={1}/>
+          </DCArtboard>
+          <DCArtboard id="m2" label="② 서계동 선택 — 핀도 이동" width={402} height={874}>
+            <MainScreen initialSelected={3}/>
+          </DCArtboard>
+          <DCArtboard id="m3" label="③ 갈월동 선택" width={402} height={874}>
+            <MainScreen initialSelected={5}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="zoom"
+          title="줌 레벨별 지도 표현"
+          subtitle="지도를 확대·축소했을 때 핀이 어떻게 변하는지"
+        >
+          <DCArtboard id="z1" label="① 줌아웃 · 동 단위 클러스터" width={402} height={874}>
+            <MainScreen initialSelected={3} zoom="far" showZoomBadge/>
+          </DCArtboard>
+          <DCArtboard id="z2" label="② 기본 · 구역 단위 가격 핀" width={402} height={874}>
+            <MainScreen initialSelected={3} zoom="medium" showZoomBadge/>
+          </DCArtboard>
+          <DCArtboard id="z3" label="③ 줌인 · 건물 단위 상세 핀" width={402} height={874}>
+            <MainScreen initialSelected={3} zoom="close" showZoomBadge/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="filter"
+          title="필터 시트"
+          subtitle="상단 필터 아이콘을 눌렀을 때 — 거래유형 · 보증금/월세 · 평수 · 방수"
+        >
+          <DCArtboard id="f1" label="필터 열림" width={402} height={874}>
+            <MainScreen initialSelected={3} filterOpen/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="commute"
+          title="통근시간 표시 — 등록 상태별"
+          subtitle="통근은 지도 필터가 아니라 카드 정보 — 검색바가 아닌 카드 영역에만 반영돼요. 등록은 마이페이지에서"
+        >
+          <DCArtboard id="c1" label="① 미등록 — 카드 위 안내 + 마이 유도" width={402} height={874}>
+            <MainScreen initialSelected={3} commuteMode="none"/>
+          </DCArtboard>
+          <DCArtboard id="c2" label="② 직장만 등록 — 카드에 통근 1개" width={402} height={874}>
+            <MainScreen initialSelected={3} commuteMode="work"/>
+          </DCArtboard>
+          <DCArtboard id="c3" label="③ 직장+학교 — 카드에 통근 2개" width={402} height={874}>
+            <MainScreen initialSelected={3} commuteMode="both"/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="places"
+          title="마이 › 직장·학교 등록"
+          subtitle="등록 진입은 마이페이지 — 회사·학교는 카카오로 이름 검색(긴 이름도 OK)"
+        >
+          <DCArtboard id="my0" label="① 마이페이지 — 미등록(안내)" width={402} height={874}>
+            <MyPage registered={false}/>
+          </DCArtboard>
+          <DCArtboard id="my1" label="② 마이페이지 — 등록됨" width={402} height={874}>
+            <MyPage registered={true}/>
+          </DCArtboard>
+          <DCArtboard id="p0" label="③ 빈 상태 (온보딩)" width={402} height={874}>
+            <PlacesEmpty/>
+          </DCArtboard>
+          <DCArtboard id="p1" label="④ 등록된 장소 목록" width={402} height={874}>
+            <PlacesList/>
+          </DCArtboard>
+          <DCArtboard id="p2" label="⑤ 새 장소 추가 (카카오 검색)" width={402} height={874}>
+            <AddPlace/>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

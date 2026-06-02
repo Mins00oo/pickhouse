@@ -30,6 +30,12 @@ export const colors = {
   condGood: '#3DA773',
   condMid: '#E9B949',
   condBad: '#D94A4A',
+  // 거점 색상 — 직장=primary(그린), 학교=보라, 기타=coral
+  school: '#7B5FCC',
+  schoolSoft: '#EFEAFB',
+  // 카카오 검색 뱃지
+  kakaoYellow: '#FEE500',
+  kakaoInk: '#3A2929',
 } as const;
 
 export type ColorKey = keyof typeof colors;

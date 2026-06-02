@@ -1,10 +1,12 @@
 import {
+  deriveCommuteMode,
   formatAnchorDistance,
   formatKm,
   getAnchorCoordinate,
   haversineKm,
+  pickPrimaryAnchors,
 } from '../houseMapUtils';
-import { AnchorPlace } from '@/types';
+import { AnchorPlace, AnchorType } from '@/types';
 
 const baseAddress = { roadAddress: '주소', jibunAddress: '', zonecode: '' };
 
@@ -13,8 +15,21 @@ function anchor(latitude?: number, longitude?: number): AnchorPlace {
     id: 'a1',
     anchorType: 'WORKPLACE',
     address: { ...baseAddress, latitude, longitude },
+    transport: 'CAR',
+    isPrimary: false,
     createdAt: '2026',
     updatedAt: '2026',
+  };
+}
+
+function place(over: Partial<AnchorPlace> & { id: string; anchorType: AnchorType }): AnchorPlace {
+  return {
+    address: { ...baseAddress, latitude: 37.5, longitude: 127.0 },
+    transport: 'CAR',
+    isPrimary: false,
+    createdAt: '2026',
+    updatedAt: '2026',
+    ...over,
   };
 }
 
@@ -66,5 +81,49 @@ describe('formatAnchorDistance', () => {
     expect(formatAnchorDistance({ anchorType: 'SCHOOL', km: 3.2, source: 'straight-line' })).toBe(
       '직선거리 약 3.2km',
     );
+  });
+
+  it('labels an estimate with approximate minutes', () => {
+    expect(
+      formatAnchorDistance({ anchorType: 'SCHOOL', km: 3.2, source: 'estimate', durationMin: 15 }),
+    ).toBe('3.2km · 약 15분');
+  });
+});
+
+describe('pickPrimaryAnchors', () => {
+  it('returns the primary WORKPLACE and SCHOOL, ignoring non-primary and OTHER', () => {
+    const places = [
+      place({ id: 'w1', anchorType: 'WORKPLACE', isPrimary: false }),
+      place({ id: 'w2', anchorType: 'WORKPLACE', isPrimary: true }),
+      place({ id: 's1', anchorType: 'SCHOOL', isPrimary: true }),
+      place({ id: 'o1', anchorType: 'OTHER', isPrimary: true }),
+    ];
+    const { work, school } = pickPrimaryAnchors(places);
+    expect(work?.id).toBe('w2');
+    expect(school?.id).toBe('s1');
+  });
+
+  it('returns null for a type with no primary', () => {
+    const { work, school } = pickPrimaryAnchors([place({ id: 'w1', anchorType: 'WORKPLACE', isPrimary: false })]);
+    expect(work).toBeNull();
+    expect(school).toBeNull();
+  });
+});
+
+describe('deriveCommuteMode', () => {
+  it("is 'none' with no primary work/school", () => {
+    expect(deriveCommuteMode([])).toBe('none');
+    expect(deriveCommuteMode([place({ id: 'o', anchorType: 'OTHER', isPrimary: true })])).toBe('none');
+  });
+
+  it("reflects which primary anchors exist", () => {
+    expect(deriveCommuteMode([place({ id: 'w', anchorType: 'WORKPLACE', isPrimary: true })])).toBe('work');
+    expect(deriveCommuteMode([place({ id: 's', anchorType: 'SCHOOL', isPrimary: true })])).toBe('school');
+    expect(
+      deriveCommuteMode([
+        place({ id: 'w', anchorType: 'WORKPLACE', isPrimary: true }),
+        place({ id: 's', anchorType: 'SCHOOL', isPrimary: true }),
+      ]),
+    ).toBe('both');
   });
 });

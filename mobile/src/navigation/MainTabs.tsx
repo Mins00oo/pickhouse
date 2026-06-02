@@ -1,12 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeMapScreen } from '@/screens/home/HomeMapScreen';
 import { HouseDetailScreen } from '@/screens/houses/HouseDetailScreen';
 import { HouseInputScreen } from '@/screens/houses/HouseInputScreen';
 import { HouseListScreen } from '@/screens/houses/HouseListScreen';
+import { ComparePlaceholderScreen } from '@/screens/compare/ComparePlaceholderScreen';
 import { MyScreen } from '@/screens/my/MyScreen';
+import { PlacesListScreen } from '@/screens/places/PlacesListScreen';
+import { AddPlaceScreen } from '@/screens/places/AddPlaceScreen';
 import { colors } from '@/theme';
+import { MainTabBar } from './MainTabBar';
 import { HouseStackParamList, MainTabParamList } from './types';
 
 const Stack = createNativeStackNavigator<HouseStackParamList>();
@@ -23,56 +26,31 @@ export function MainTabs() {
       }}
     >
       <Stack.Screen name="MainTabs" component={BottomTabs} options={{ headerShown: false }} />
-      <Stack.Screen
-        name="HouseInput"
-        component={HouseInputScreen}
-        options={{ title: '집 추가', headerShown: false }}
-      />
+      <Stack.Screen name="HouseInput" component={HouseInputScreen} options={{ title: '집 추가', headerShown: false }} />
       <Stack.Screen name="HouseDetail" component={HouseDetailScreen} options={{ title: '집 상세' }} />
+      <Stack.Screen name="Places" component={PlacesListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AddPlace" component={AddPlaceScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
+}
+
+// 중앙 ＋집추가 탭은 화면을 갖지 않고 HouseInput으로 이동만 한다(MainTabBar에서 처리).
+function AddHousePlaceholder() {
+  return null;
 }
 
 function BottomTabs() {
   return (
     <Tab.Navigator
-      initialRouteName="Home"
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        animation: 'none',
-        tabBarActiveTintColor: '#0E1A14',
-        tabBarInactiveTintColor: colors.inkMuted,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
-          paddingTop: 2,
-        },
-        tabBarStyle: {
-          height: 78,
-          paddingTop: 6,
-          paddingBottom: 10,
-          borderTopColor: '#EFEDE5',
-          backgroundColor: colors.white,
-        },
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name={tabIconName(route.name)} size={size + 2} color={color} />
-        ),
-      })}
+      initialRouteName="Map"
+      tabBar={(props) => <MainTabBar {...props} />}
+      screenOptions={{ headerShown: false, animation: 'none' }}
     >
-      <Tab.Screen name="Home" component={HomeMapScreen} options={{ title: '홈' }} />
-      <Tab.Screen name="HouseList" component={HouseListScreen} options={{ title: '보관함' }} />
+      <Tab.Screen name="Map" component={HomeMapScreen} options={{ title: '지도' }} />
+      <Tab.Screen name="List" component={HouseListScreen} options={{ title: '목록' }} />
+      <Tab.Screen name="AddHouseTab" component={AddHousePlaceholder} options={{ title: '집 추가' }} />
+      <Tab.Screen name="Compare" component={ComparePlaceholderScreen} options={{ title: '비교' }} />
       <Tab.Screen name="My" component={MyScreen} options={{ title: '마이' }} />
     </Tab.Navigator>
   );
-}
-
-function tabIconName(routeName: keyof MainTabParamList) {
-  switch (routeName) {
-    case 'Home':
-      return 'home-outline';
-    case 'HouseList':
-      return 'folder-open-outline';
-    case 'My':
-      return 'person-outline';
-  }
 }

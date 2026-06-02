@@ -1,4 +1,4 @@
-import { AnchorPlace, AnchorType } from '@/types';
+import { AnchorPlace, AnchorType, TransportMode } from '@/types';
 import { getDatabase } from './database';
 
 // SQLite row shape — `user_id` 컬럼은 오프라인 스코핑용(UI 타입엔 없음).
@@ -10,6 +10,8 @@ type AnchorRow = {
   address_json: string;
   latitude: number | null;
   longitude: number | null;
+  transport: string | null;
+  is_primary: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -20,25 +22,30 @@ function rowToAnchor(r: AnchorRow): AnchorPlace {
     anchorType: r.anchor_type as AnchorType,
     label: r.label ?? undefined,
     address: JSON.parse(r.address_json),
+    transport: (r.transport as TransportMode) ?? 'CAR', // 기존 행(NULL) 호환 → 기본 자동차
+    isPrimary: r.is_primary === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
 }
 
 export const anchorPlacesRepo = {
-  // 타입별 1개 보장: (user_id, anchor_type) UNIQUE 충돌 시 갱신.
+  // id 기준 upsert — 신규(새 id)와 수정(기존 id)을 모두 처리. 타입당 여러 개 허용.
   async upsert(p: AnchorPlace, userId: string): Promise<void> {
     const db = await getDatabase();
     await db.runAsync(
       `INSERT INTO anchor_places (
         id, user_id, anchor_type, label, address_json, latitude, longitude,
-        created_at, updated_at, is_dirty
-      ) VALUES (?,?,?,?,?,?,?,?,?,1)
-      ON CONFLICT(user_id, anchor_type) DO UPDATE SET
+        transport, is_primary, created_at, updated_at, is_dirty
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
+      ON CONFLICT(id) DO UPDATE SET
+        anchor_type=excluded.anchor_type,
         label=excluded.label,
         address_json=excluded.address_json,
         latitude=excluded.latitude,
         longitude=excluded.longitude,
+        transport=excluded.transport,
+        is_primary=excluded.is_primary,
         updated_at=excluded.updated_at,
         is_dirty=1`,
       p.id,
@@ -48,37 +55,36 @@ export const anchorPlacesRepo = {
       JSON.stringify(p.address),
       p.address.latitude ?? null,
       p.address.longitude ?? null,
+      p.transport,
+      p.isPrimary ? 1 : 0,
       p.createdAt,
       p.updatedAt,
     );
   },
 
-  async getByType(userId: string, type: AnchorType): Promise<AnchorPlace | null> {
+  // 같은 타입의 다른 주 통근지를 해제(타입당 주 통근지 최대 1개 보장).
+  async clearPrimaryExcept(userId: string, anchorType: AnchorType, exceptId: string): Promise<void> {
     const db = await getDatabase();
-    const row = await db.getFirstAsync<AnchorRow>(
-      'SELECT * FROM anchor_places WHERE user_id = ? AND anchor_type = ?',
+    await db.runAsync(
+      'UPDATE anchor_places SET is_primary = 0, is_dirty = 1 WHERE user_id = ? AND anchor_type = ? AND id <> ?',
       userId,
-      type,
+      anchorType,
+      exceptId,
     );
-    return row ? rowToAnchor(row) : null;
   },
 
   async listActive(userId: string): Promise<AnchorPlace[]> {
     const db = await getDatabase();
     const rows = await db.getAllAsync<AnchorRow>(
-      'SELECT * FROM anchor_places WHERE user_id = ? ORDER BY anchor_type ASC',
+      'SELECT * FROM anchor_places WHERE user_id = ? ORDER BY created_at ASC',
       userId,
     );
     return (rows ?? []).map(rowToAnchor);
   },
 
-  // 로컬 전용 고정 슬롯 → 하드 삭제.
-  async clear(userId: string, type: AnchorType): Promise<void> {
+  // 로컬 전용 → 하드 삭제.
+  async remove(id: string): Promise<void> {
     const db = await getDatabase();
-    await db.runAsync(
-      'DELETE FROM anchor_places WHERE user_id = ? AND anchor_type = ?',
-      userId,
-      type,
-    );
+    await db.runAsync('DELETE FROM anchor_places WHERE id = ?', id);
   },
 };

@@ -10,7 +10,7 @@ import { housesApi } from '@/api/houses.api';
 import { housesRepo } from '@/db/houses.repo';
 import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
 import { useAuthStore } from '@/stores/authStore';
-import type { AnchorPlace, House } from '@/types';
+import type { House } from '@/types';
 import { HomeMapScreen } from '../HomeMapScreen';
 
 jest.mock('@/db/houses.repo');
@@ -126,21 +126,6 @@ beforeEach(() => {
   });
   (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
 });
-
-const workplaceAnchor: AnchorPlace = {
-  id: 'anchor-w',
-  anchorType: 'WORKPLACE',
-  label: '판교 카카오',
-  address: {
-    roadAddress: '경기 성남시 분당구 판교역로 166',
-    jibunAddress: '',
-    zonecode: '',
-    latitude: 37.3954,
-    longitude: 127.1105,
-  },
-  createdAt: '2026-06-01T00:00:00Z',
-  updatedAt: '2026-06-01T00:00:00Z',
-};
 
 afterEach(() => {
   jest.useRealTimers();
@@ -273,8 +258,8 @@ describe('HomeMapScreen', () => {
     );
   });
 
-  it('uses a calmer basic map tone and removes unused map/search icons', async () => {
-    const { findByText, getByTestId, queryByText } = renderHome([nearbyHouse]);
+  it('uses a calmer basic map tone with the design search/layers controls', async () => {
+    const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
     await findByText('망원 소형집');
 
@@ -282,8 +267,17 @@ describe('HomeMapScreen', () => {
     expect(getByTestId('house-map-view').props.lightness).toBe(0.06);
     expect(getByTestId('house-map-view').props.symbolScale).toBe(0.86);
     expect(getByTestId('house-map-view').props.buildingHeight).toBe(0.35);
-    expect(queryByText('menu-outline')).toBeNull();
-    expect(queryByText('layers-outline')).toBeNull();
+    // 디자인: 검색 pill 좌측 메뉴 아이콘 + 우측 플로팅 레이어 버튼
+    expect(getByTestId('home-layers-button')).toBeTruthy();
+  });
+
+  it('toggles the map type from the layers button', async () => {
+    const { findByText, getByTestId } = renderHome([nearbyHouse]);
+
+    await findByText('망원 소형집');
+    expect(getByTestId('house-map-view').props.mapType).toBe('Basic');
+    fireEvent.press(getByTestId('home-layers-button'));
+    expect(getByTestId('house-map-view').props.mapType).toBe('Satellite');
   });
 
   it('renders a custom current location marker instead of the native location overlay', async () => {
@@ -295,30 +289,26 @@ describe('HomeMapScreen', () => {
     expect(getByTestId('house-map-view').props.locationOverlay).toBeUndefined();
   });
 
-  it('renders the selected marker as a custom price balloon and icon-only markers for the rest', async () => {
-    const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
+  it('renders the selected house as a tight two-line callout (icon + 거래유형/가격 in-view) and teardrop pins for the rest', async () => {
+    const { findByText, getByTestId, getByText } = renderHome([nearbyHouse, outsideHouse]);
 
     await findByText('망원 소형집');
 
     await waitFor(() => expect(getByTestId('home-house-marker-near')).toBeTruthy());
-    expect(queryByTestId('home-map-overlay-layer')).toBeNull();
     expect(getByTestId('home-house-marker-near').props.latitude).toBe(37.556);
     expect(getByTestId('home-house-marker-near').props.longitude).toBe(126.901);
-    expect(getByTestId('home-house-marker-near').props.width).toBe(148);
-    expect(getByTestId('home-house-marker-near').props.height).toBe(34);
-    // 선택 마커: 알약 배경은 커스텀 RN 뷰, 가격 텍스트는 네이티브 caption(중앙 정렬)으로 그린다.
-    expect(getByTestId('home-house-marker-near').props.caption).toEqual(
-      expect.objectContaining({ text: expect.stringContaining('1,000 / 50'), align: 'Center' }),
-    );
-    expect(getByTestId('home-house-marker-near').props.subCaption).toBeUndefined();
-    expect(queryByTestId('home-house-marker-price-near')).toBeNull();
+    // 콜아웃은 내용에 맞춰 컴팩트(고정 168 아님) + 텍스트는 in-view(직속 자식), caption 미사용.
+    expect(getByTestId('home-house-marker-near').props.height).toBe(50);
+    expect(getByTestId('home-house-marker-near').props.width).toBeGreaterThan(90);
+    expect(getByTestId('home-house-marker-near').props.width).toBeLessThan(140);
+    expect(getByTestId('home-house-marker-near').props.caption).toBeUndefined();
+    expect(getByText('1,000/50')).toBeTruthy(); // 가격 줄(공백 없는 포맷 → 마커 전용, 카드와 구분)
 
+    // 미선택: 물방울 하우스 핀(텍스트 없음).
     expect(getByTestId('home-house-marker-outside')).toBeTruthy();
-    expect(getByTestId('home-house-marker-outside').props.width).toBe(36);
-    expect(getByTestId('home-house-marker-outside').props.height).toBe(36);
+    expect(getByTestId('home-house-marker-outside').props.width).toBe(34);
+    expect(getByTestId('home-house-marker-outside').props.height).toBe(44);
     expect(getByTestId('home-house-marker-outside').props.caption).toBeUndefined();
-    expect(getByTestId('home-house-marker-outside').props.subCaption).toBeUndefined();
-    expect(queryByTestId('home-house-marker-price-outside')).toBeNull();
   });
 
   it('keeps house markers attached to native coordinates without screen projection', async () => {
@@ -410,15 +400,6 @@ describe('HomeMapScreen', () => {
     expect(getByTestId('home-house-card-outside')).toHaveStyle({ borderColor: '#0E1A14' });
   });
 
-  it('opens the house input flow from the home add button', async () => {
-    const { findByText, getByTestId, nav } = renderHome([nearbyHouse]);
-
-    await findByText('망원 소형집');
-    fireEvent.press(getByTestId('home-add-house-button'));
-
-    expect(nav.navigate).toHaveBeenCalledWith('HouseInput', undefined);
-  });
-
   it('switches from map mode to an opaque full-screen list mode and back', async () => {
     const { findByText, getByText, getByTestId, queryByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
@@ -466,11 +447,10 @@ describe('HomeMapScreen', () => {
     expect(queryByText('망원 소형집')).toBeNull();
   });
 
-  it('ships scaled native marker assets so map pins stay sharp on retina screens', () => {
+  it('ships the scaled current-location marker asset for retina screens', () => {
     const markerRoot = path.join(process.cwd(), 'assets', 'map-markers');
-    const markerNames = ['marker-house', 'marker-cluster', 'marker-current-location', 'marker-price-selected'];
-
-    markerNames.forEach((name) => {
+    // 하우스/클러스터/선택 핀은 RN 도형으로 그리므로 PNG가 필요한 것은 현위치 마커뿐이다.
+    ['marker-current-location'].forEach((name) => {
       expect(fs.existsSync(path.join(markerRoot, `${name}.png`))).toBe(true);
       expect(fs.existsSync(path.join(markerRoot, `${name}@2x.png`))).toBe(true);
       expect(fs.existsSync(path.join(markerRoot, `${name}@3x.png`))).toBe(true);
@@ -492,27 +472,25 @@ describe('HomeMapScreen', () => {
     expect(getByTestId('home-sort-label')).toHaveTextContent('가격 낮은 순');
   });
 
-  it('shows the anchor nudge when no workplace/school is registered and opens the sheet', async () => {
-    const { findByText, getByTestId } = renderHome([nearbyHouse]);
+  it('shows a primary commute time on house cards and hides the register banner once registered', async () => {
+    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([
+      {
+        id: 'w1',
+        anchorType: 'WORKPLACE',
+        label: '회사',
+        address: { roadAddress: '', jibunAddress: '', zonecode: '', latitude: 37.5, longitude: 127.03 },
+        transport: 'TRANSIT',
+        isPrimary: true,
+        createdAt: '2026',
+        updatedAt: '2026',
+      },
+    ]);
+    const { findByText, queryByTestId } = renderHome([nearbyHouse]);
 
     await findByText('망원 소형집');
-    expect(getByTestId('anchor-nudge')).toBeTruthy();
-
-    fireEvent.press(getByTestId('home-anchor-button'));
-
-    expect(await findByText('내 직장 · 학교')).toBeTruthy();
-    expect(getByTestId('anchor-row-WORKPLACE')).toBeTruthy();
-    expect(getByTestId('anchor-row-SCHOOL')).toBeTruthy();
-  });
-
-  it('renders an anchor marker and hides the nudge once a workplace is registered', async () => {
-    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplaceAnchor]);
-    const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse]);
-
-    await findByText('망원 소형집');
-    await waitFor(() => expect(getByTestId('home-anchor-marker-WORKPLACE')).toBeTruthy());
-    expect(getByTestId('home-anchor-marker-WORKPLACE').props.latitude).toBe(37.3954);
-    expect(queryByTestId('anchor-nudge')).toBeNull();
+    // 대중교통 추정은 API 없이 즉시 계산되어 카드에 "N분"이 뜬다.
+    expect(await findByText(/\d+분/)).toBeTruthy();
+    expect(queryByTestId('home-commute-register')).toBeNull();
   });
 
   it('opens the filter sheet from the top filter button', async () => {

@@ -51,14 +51,40 @@ export function formatKm(km: number): string {
   return `${km.toFixed(1)}km`;
 }
 
-/** 거리 + (driving이면) 차 소요시간 한 줄. straight-line은 "직선거리 약" 라벨. */
+/** 거리 + 소요시간 한 줄. driving=차 N분, estimate=약 N분, straight-line="직선거리 약". */
 export function formatAnchorDistance(d: AnchorDistance): string {
   const dist = formatKm(d.km);
   if (d.source === 'driving') {
     if (typeof d.durationMin === 'number') return `${dist} · 차 ${d.durationMin}분`;
     return dist;
   }
+  if (d.source === 'estimate') {
+    if (typeof d.durationMin === 'number') return `${dist} · 약 ${d.durationMin}분`;
+    return `약 ${dist}`;
+  }
   return `직선거리 약 ${dist}`;
+}
+
+/**
+ * 메인 카드에 표시할 '주 통근지' 추출 — 타입별 isPrimary 장소.
+ * 기타(OTHER)는 카드에 표시하지 않으므로 무시한다.
+ */
+export function pickPrimaryAnchors(places: AnchorPlace[]): {
+  work: AnchorPlace | null;
+  school: AnchorPlace | null;
+} {
+  const work = places.find((p) => p.anchorType === 'WORKPLACE' && p.isPrimary) ?? null;
+  const school = places.find((p) => p.anchorType === 'SCHOOL' && p.isPrimary) ?? null;
+  return { work, school };
+}
+
+/** 주 통근지 직장/학교 유무에서 카드 통근 표시 모드를 파생. */
+export function deriveCommuteMode(places: AnchorPlace[]): 'none' | 'work' | 'school' | 'both' {
+  const { work, school } = pickPrimaryAnchors(places);
+  if (work && school) return 'both';
+  if (work) return 'work';
+  if (school) return 'school';
+  return 'none';
 }
 
 export function getHouseTitle(house: House): string {

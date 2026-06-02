@@ -180,34 +180,33 @@ describe('HouseInputScreen (위저드)', () => {
     });
   });
 
-  it('shows water as a separate utility estimate when water is not included', () => {
-    const { getByTestId } = render(
-      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
-    );
-
-    fireEvent.press(getByTestId('add-step-tab-가격'));
-
-    expect(getByTestId('utility-수도')).toBeTruthy();
-    expect(getByTestId('utility-전기')).toBeTruthy();
-    expect(getByTestId('utility-가스')).toBeTruthy();
-  });
-
-  it('hides the water utility estimate when water is included in maintenance', () => {
+  it('shows electricity/gas as separate utility estimates (water is not a separate-pay input)', () => {
     const { getByTestId, queryByTestId } = render(
       wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
     );
 
     fireEvent.press(getByTestId('add-step-tab-가격'));
-    expect(getByTestId('utility-수도')).toBeTruthy();
 
-    fireEvent.press(getByTestId('maint-include-수도'));
-
-    expect(queryByTestId('utility-수도')).toBeNull();
     expect(getByTestId('utility-전기')).toBeTruthy();
+    expect(getByTestId('utility-가스')).toBeTruthy();
+    expect(queryByTestId('utility-수도')).toBeNull();
+  });
+
+  it('hides the electricity estimate when electricity is included in maintenance', () => {
+    const { getByTestId, queryByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    expect(getByTestId('utility-전기')).toBeTruthy();
+
+    fireEvent.press(getByTestId('maint-include-전기'));
+
+    expect(queryByTestId('utility-전기')).toBeNull();
     expect(getByTestId('utility-가스')).toBeTruthy();
   });
 
-  it('saves a water utility estimate when water is paid separately', async () => {
+  it('saves an electricity utility estimate when electricity is paid separately', async () => {
     const nav = navMock();
     const { getByTestId, findByTestId } = render(
       wrap(<HouseInputScreen navigation={nav} route={route()} />),
@@ -217,16 +216,25 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.press(getByTestId('add-step-tab-가격'));
     fireEvent.changeText(getByTestId('amount-보증금'), '1000');
     fireEvent.changeText(getByTestId('amount-월세'), '50');
-    fireEvent.changeText(getByTestId('utility-수도'), '2');
+    fireEvent.changeText(getByTestId('utility-전기'), '2');
     fireEvent.press(getByTestId('save-button'));
 
     await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
     expect(housesRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        utilityEstimates: expect.objectContaining({ WATER: 2 }),
+        utilityEstimates: expect.objectContaining({ ELECTRIC: 2 }),
       }),
       'u1',
     );
+  });
+
+  it('shows the live maintenance summary banner on the price step', () => {
+    const { getByTestId } = render(
+      wrap(<HouseInputScreen navigation={navMock()} route={route()} />),
+    );
+    fireEvent.press(getByTestId('add-step-tab-가격'));
+    fireEvent.changeText(getByTestId('amount-관리비'), '7');
+    expect(getByTestId('maintenance-summary')).toHaveTextContent(/관리비\s*7만원/);
   });
 
   it('persists structure & condition fields chosen across steps', async () => {
