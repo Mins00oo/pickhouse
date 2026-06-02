@@ -1,4 +1,4 @@
-import { AnchorDistance, AnchorPlace, House, RATING_KEYS } from '@/types';
+import { AnchorDistance, AnchorPlace, House } from '@/types';
 
 export type MapCoordinate = {
   latitude: number;
@@ -150,16 +150,6 @@ export function getHouseMeta(house: House): string {
   }
   if (typeof house.rooms === 'number') parts.push(`방 ${house.rooms}`);
   return parts.join(' · ');
-}
-
-export function getAverageRating(house: House): number {
-  const values: number[] = [];
-  for (const key of RATING_KEYS) {
-    const value = house[key];
-    if (typeof value === 'number') values.push(value);
-  }
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 export function getVisitedLabel(house: House): string {
