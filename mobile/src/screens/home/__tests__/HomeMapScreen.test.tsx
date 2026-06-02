@@ -8,12 +8,14 @@ import * as Location from 'expo-location';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { housesApi } from '@/api/houses.api';
 import { housesRepo } from '@/db/houses.repo';
+import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
 import { useAuthStore } from '@/stores/authStore';
-import type { House } from '@/types';
+import type { AnchorPlace, House } from '@/types';
 import { HomeMapScreen } from '../HomeMapScreen';
 
 jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
+jest.mock('@/db/anchorPlaces.repo');
 
 let queryClient: QueryClient | null = null;
 
@@ -122,7 +124,23 @@ beforeEach(() => {
   (Location.getCurrentPositionAsync as jest.Mock).mockResolvedValue({
     coords: { latitude: 37.5563, longitude: 126.9236 },
   });
+  (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
 });
+
+const workplaceAnchor: AnchorPlace = {
+  id: 'anchor-w',
+  anchorType: 'WORKPLACE',
+  label: '판교 카카오',
+  address: {
+    roadAddress: '경기 성남시 분당구 판교역로 166',
+    jibunAddress: '',
+    zonecode: '',
+    latitude: 37.3954,
+    longitude: 127.1105,
+  },
+  createdAt: '2026-06-01T00:00:00Z',
+  updatedAt: '2026-06-01T00:00:00Z',
+};
 
 afterEach(() => {
   jest.useRealTimers();
@@ -472,6 +490,29 @@ describe('HomeMapScreen', () => {
 
     expect(getByTestId('home-house-card-near')).toHaveStyle({ borderColor: '#0E1A14' });
     expect(getByTestId('home-sort-label')).toHaveTextContent('가격 낮은 순');
+  });
+
+  it('shows the anchor nudge when no workplace/school is registered and opens the sheet', async () => {
+    const { findByText, getByTestId } = renderHome([nearbyHouse]);
+
+    await findByText('망원 소형집');
+    expect(getByTestId('anchor-nudge')).toBeTruthy();
+
+    fireEvent.press(getByTestId('home-anchor-button'));
+
+    expect(await findByText('내 직장 · 학교')).toBeTruthy();
+    expect(getByTestId('anchor-row-WORKPLACE')).toBeTruthy();
+    expect(getByTestId('anchor-row-SCHOOL')).toBeTruthy();
+  });
+
+  it('renders an anchor marker and hides the nudge once a workplace is registered', async () => {
+    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplaceAnchor]);
+    const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse]);
+
+    await findByText('망원 소형집');
+    await waitFor(() => expect(getByTestId('home-anchor-marker-WORKPLACE')).toBeTruthy());
+    expect(getByTestId('home-anchor-marker-WORKPLACE').props.latitude).toBe(37.3954);
+    expect(queryByTestId('anchor-nudge')).toBeNull();
   });
 
   it('opens the filter sheet from the top filter button', async () => {
