@@ -96,7 +96,7 @@ describe('HouseListScreen', () => {
       wrap(<HouseListScreen navigation={nav} route={{} as any} />),
     );
 
-    expect(await findByText('보관함')).toBeTruthy();
+    expect(await findByText('목록')).toBeTruthy();
     expect(await findByText('전체 기록 2')).toBeTruthy();
     expect(await findByTestId('house-list-row-h1')).toBeTruthy();
     expect(await findByTestId('house-list-row-h2')).toBeTruthy();

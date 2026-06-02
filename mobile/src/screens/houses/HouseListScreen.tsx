@@ -8,7 +8,7 @@ import { useHouses } from '@/queries/houses.queries';
 import { colors, spacing, typography } from '@/theme';
 import { HouseRecordRow } from './components/HouseRecordRow';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'HouseList'>;
+type Props = BottomTabScreenProps<MainTabParamList, 'List'>;
 
 export function HouseListScreen({ navigation }: Props) {
   const { data = [], refetch, isFetching } = useHouses();
@@ -27,7 +27,7 @@ export function HouseListScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>보관함</Text>
+        <Text style={styles.title}>목록</Text>
         <View style={styles.headerMeta}>
           <Text style={styles.subtitle}>전체 기록 {houses.length}</Text>
           <Text style={styles.sortText}>최근 본 순</Text>
