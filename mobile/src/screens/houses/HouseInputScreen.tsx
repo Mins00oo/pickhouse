@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { cameraHelper } from '@/photos/cameraHelper';
@@ -40,8 +41,8 @@ type Props = NativeStackScreenProps<HouseStackParamList, 'HouseInput'>;
 type WizardDealType = Extract<DealType, 'WOLSE' | 'JEONSE'>;
 type SeparateUtility = 'WATER' | 'ELECTRIC' | 'GAS';
 
+// 별도 납부 입력은 전기·가스만 (수도/인터넷은 보통 정액 포함). 디자인의 METER=[전기,가스]와 일치.
 const SEPARATE_UTILITY_OPTIONS: { code: SeparateUtility; label: string }[] = [
-  { code: 'WATER', label: '수도' },
   { code: 'ELECTRIC', label: '전기' },
   { code: 'GAS', label: '가스' },
 ];
@@ -281,6 +282,11 @@ export function HouseInputScreen({ navigation, route }: Props) {
 
   const includedCodes = form.maintenanceIncludes.map((i) => MAINTENANCE_OPTIONS[i]!.code);
   const separateUtilities = SEPARATE_UTILITY_OPTIONS.filter((o) => !includedCodes.includes(o.code));
+  const includedLabels = form.maintenanceIncludes
+    .map((i) => MAINTENANCE_OPTIONS[i]?.label)
+    .filter((l): l is string => Boolean(l));
+  const separateLabels = separateUtilities.map((o) => o.label);
+  const maintenanceFeeNum = parseInt(form.maintenanceFee || '', 10) || 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }} edges={['top', 'bottom']}>
@@ -316,6 +322,7 @@ export function HouseInputScreen({ navigation, route }: Props) {
                   value={form.nickname}
                   onChangeText={(t) => set('nickname', t)}
                   placeholder="예: 청파동 빌라"
+                  icon="home-outline"
                 />
               </Field>
               <Field>
@@ -410,6 +417,34 @@ export function HouseInputScreen({ navigation, route }: Props) {
                   </View>
                 </Field>
               ) : null}
+
+              <View
+                testID="maintenance-summary"
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 9,
+                  padding: 13,
+                  borderRadius: 13,
+                  backgroundColor: colors.primarySoft,
+                }}
+              >
+                <Ionicons name="receipt-outline" size={16} color={colors.primary} />
+                <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '500', color: colors.primaryDark, lineHeight: 18, letterSpacing: -0.2 }}>
+                  관리비 <Text style={{ fontWeight: '800' }}>{maintenanceFeeNum.toLocaleString('ko-KR')}만원</Text>
+                  {includedLabels.length > 0 ? (
+                    <Text>
+                      에 <Text style={{ fontWeight: '800' }}>{includedLabels.join('·')}</Text> 포함
+                    </Text>
+                  ) : null}
+                  {separateLabels.length > 0 ? (
+                    <Text>
+                      {' · '}
+                      <Text style={{ fontWeight: '800' }}>{separateLabels.join('·')}</Text> 별도 납부
+                    </Text>
+                  ) : null}
+                </Text>
+              </View>
             </>
           ) : null}
 
@@ -556,11 +591,13 @@ function LineInput({
   value,
   onChangeText,
   placeholder,
+  icon,
 }: {
   testID: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
+  icon?: string;
 }) {
   return (
     <View
@@ -573,8 +610,10 @@ function LineInput({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 14,
+        gap: 8,
       }}
     >
+      {icon ? <Ionicons name={icon as never} size={18} color={colors.muted} /> : null}
       <TextInput
         testID={testID}
         accessibilityLabel={testID}

@@ -11,7 +11,7 @@ export interface StepTabsProps {
   requiredSteps?: number[];
 }
 
-export function StepTabs({ step, onJump, onClose, requiredSteps = [1, 2] }: StepTabsProps) {
+export function StepTabs({ step, onJump, onClose, requiredSteps = [1] }: StepTabsProps) {
   return (
     <View style={{ backgroundColor: colors.white, paddingHorizontal: 18, paddingTop: 8 }}>
       <View
