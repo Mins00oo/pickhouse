@@ -30,6 +30,17 @@ describe('migrations', () => {
     expect(sql).toMatch(/CREATE UNIQUE INDEX.*anchor_places\(user_id, anchor_type\)/s);
   });
 
+  it('relaxes anchor_places to multi-place with transport + is_primary in v4', () => {
+    const v4 = migrations.find((m) => m.version === 4);
+    expect(v4).toBeDefined();
+    const sql = v4!.sql;
+    // 이동수단 + 주 통근지 컬럼 추가
+    expect(sql).toMatch(/ALTER TABLE anchor_places ADD COLUMN transport/);
+    expect(sql).toMatch(/ALTER TABLE anchor_places ADD COLUMN is_primary/);
+    // 타입당 1개 제약 제거 → 여러 개 허용
+    expect(sql).toMatch(/DROP INDEX.*idx_anchor_user_type/s);
+  });
+
   it('adds the add-house wizard columns in migration v2', () => {
     const v2 = migrations.find((m) => m.version === 2);
     expect(v2).toBeDefined();
