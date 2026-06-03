@@ -151,4 +151,11 @@ export const migrations: Migration[] = [
       DROP INDEX IF EXISTS idx_anchor_user_type;
     `,
   },
+  {
+    // 거점 서버 동기화 대비: 하드삭제 → 소프트삭제 전환(houses 미러). is_deleted 추가.
+    version: 5,
+    sql: `
+      ALTER TABLE anchor_places ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

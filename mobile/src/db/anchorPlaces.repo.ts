@@ -36,8 +36,8 @@ export const anchorPlacesRepo = {
     await db.runAsync(
       `INSERT INTO anchor_places (
         id, user_id, anchor_type, label, address_json, latitude, longitude,
-        transport, is_primary, created_at, updated_at, is_dirty
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
+        transport, is_primary, created_at, updated_at, is_dirty, is_deleted
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,0)
       ON CONFLICT(id) DO UPDATE SET
         anchor_type=excluded.anchor_type,
         label=excluded.label,
@@ -73,18 +73,44 @@ export const anchorPlacesRepo = {
     );
   },
 
+  async findById(id: string): Promise<AnchorPlace | null> {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<AnchorRow>(
+      'SELECT * FROM anchor_places WHERE id = ? AND is_deleted = 0',
+      id,
+    );
+    return row ? rowToAnchor(row) : null;
+  },
+
   async listActive(userId: string): Promise<AnchorPlace[]> {
     const db = await getDatabase();
     const rows = await db.getAllAsync<AnchorRow>(
-      'SELECT * FROM anchor_places WHERE user_id = ? ORDER BY created_at ASC',
+      'SELECT * FROM anchor_places WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at ASC',
       userId,
     );
     return (rows ?? []).map(rowToAnchor);
   },
 
-  // 로컬 전용 → 하드 삭제.
-  async remove(id: string): Promise<void> {
+  // 서버 동기화 대비 소프트 삭제(houses 미러).
+  async softDelete(id: string): Promise<void> {
     const db = await getDatabase();
-    await db.runAsync('DELETE FROM anchor_places WHERE id = ?', id);
+    await db.runAsync(
+      'UPDATE anchor_places SET is_deleted = 1, is_dirty = 1, updated_at = ? WHERE id = ?',
+      new Date().toISOString(),
+      id,
+    );
+  },
+
+  async markClean(id: string): Promise<void> {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE anchor_places SET is_dirty = 0 WHERE id = ?', id);
+  },
+
+  async listDirty(): Promise<AnchorPlace[]> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<AnchorRow>(
+      'SELECT * FROM anchor_places WHERE is_dirty = 1',
+    );
+    return (rows ?? []).map(rowToAnchor);
   },
 };

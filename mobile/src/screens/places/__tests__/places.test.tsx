@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { anchorPlacesApi } from '@/api/anchorPlaces.api';
 import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
 import { useAuthStore } from '@/stores/authStore';
@@ -11,6 +12,7 @@ import { MyScreen } from '@/screens/my/MyScreen';
 import { PlacesListScreen } from '../PlacesListScreen';
 
 jest.mock('@/db/anchorPlaces.repo');
+jest.mock('@/api/anchorPlaces.api');
 jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 
@@ -49,6 +51,7 @@ beforeEach(() => {
   (housesRepo.listActive as jest.Mock).mockResolvedValue([]);
   (housesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
   (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
+  (anchorPlacesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
 });
 
 describe('MyScreen', () => {

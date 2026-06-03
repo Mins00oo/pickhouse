@@ -2,6 +2,8 @@ import { syncQueueRepo, SyncOp } from '@/db/syncQueue.repo';
 import { housesApi } from '@/api/houses.api';
 import { housesRepo } from '@/db/houses.repo';
 import { residencesApi } from '@/api/residences.api';
+import { anchorPlacesApi } from '@/api/anchorPlaces.api';
+import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
 import { networkMonitor } from './networkMonitor';
 
 const MAX_ATTEMPTS = 5;
@@ -23,6 +25,16 @@ async function processOp(op: SyncOp): Promise<void> {
       await housesRepo.markClean(op.entityId);
     } else if (op.opType === 'delete') {
       await housesApi.remove(op.entityId);
+    }
+  } else if (op.entity === 'anchorPlace') {
+    if (op.opType === 'create') {
+      await anchorPlacesApi.create(op.payload as never);
+      await anchorPlacesRepo.markClean(op.entityId);
+    } else if (op.opType === 'update') {
+      await anchorPlacesApi.update(op.entityId, op.payload as never);
+      await anchorPlacesRepo.markClean(op.entityId);
+    } else if (op.opType === 'delete') {
+      await anchorPlacesApi.remove(op.entityId);
     }
   } else if (op.entity === 'residence') {
     if (op.opType === 'create') {
