@@ -56,6 +56,9 @@ export const MAINTENANCE_OPTIONS: { code: MaintenanceUtility; label: string }[] 
   { code: 'INTERNET', label: '인터넷' },
 ];
 
+/** 건축연도 표시 라벨. 값 없으면 '—'. (예: 2018 → '2018년') */
+export const builtYearLabel = (year?: number): string => (year ? `${year}년` : '—');
+
 export const roomTypeLabel = (c?: RoomType) => ROOM_TYPE_OPTIONS.find((o) => o.code === c)?.label;
 export const floorTypeLabel = (c?: FloorType) =>
   FLOOR_TYPE_OPTIONS.find((o) => o.code === c)?.label;

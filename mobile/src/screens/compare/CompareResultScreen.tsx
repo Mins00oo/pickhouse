@@ -10,7 +10,7 @@ import { House } from '@/types';
 import { colors } from '@/theme';
 import { getDisplayHouses } from '@/screens/houses/houseSampleData';
 import { formatDepositShort, pickPrimaryAnchors } from '@/screens/houses/houseMapUtils';
-import { dealTypeLabel, FACILITY_META, roomTypeLabel } from '@/domain/house';
+import { builtYearLabel, dealTypeLabel, FACILITY_META, roomTypeLabel } from '@/domain/house';
 import { CompareTopBar } from './components/CompareTopBar';
 import { CompareHeader } from './components/CompareHeader';
 import { SectionLabel } from './components/SectionLabel';
@@ -141,6 +141,18 @@ function Summary({
             <MetricBar label="학교" la={commuteA.school!} rb={commuteB.school!} unit="분" />
           </>
         ) : null}
+        {a.builtYear || b.builtYear ? (
+          <>
+            <View style={styles.divider} />
+            <CompareRow
+              label="건축연도"
+              left={builtYearLabel(a.builtYear)}
+              right={builtYearLabel(b.builtYear)}
+              hi={higherSide(a.builtYear, b.builtYear)}
+              dense
+            />
+          </>
+        ) : null}
       </View>
 
       {/* 컨디션 — 실제 값 + 색 */}
@@ -203,6 +215,12 @@ function FullTable({
       <CompareRow label="평수" left={`${a.area ?? 0}평`} right={`${b.area ?? 0}평`} hi={higherSide(a.area, b.area)} />
       <CompareRow label="방" left={roomLabel(a)} right={roomLabel(b)} />
       <CompareRow label="층" left={floorLabel(a)} right={floorLabel(b)} />
+      <CompareRow
+        label="건축연도"
+        left={builtYearLabel(a.builtYear)}
+        right={builtYearLabel(b.builtYear)}
+        hi={higherSide(a.builtYear, b.builtYear)}
+      />
 
       <SectionLabel icon="sunny">컨디션</SectionLabel>
       <ConditionRows a={a} b={b} />

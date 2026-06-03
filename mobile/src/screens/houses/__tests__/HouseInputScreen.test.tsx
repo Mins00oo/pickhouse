@@ -250,6 +250,7 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.press(getByTestId('add-step-tab-구조'));
     fireEvent.press(getByTestId('roomtype-1.5룸'));
     fireEvent.press(getByTestId('pyeong-preset-9'));
+    fireEvent.changeText(getByTestId('builtyear-input'), '2018');
     fireEvent.press(getByTestId('direction-남향'));
     fireEvent.press(getByTestId('add-step-tab-체크'));
     fireEvent.press(getByTestId('condition-수압-좋음'));
@@ -261,6 +262,7 @@ describe('HouseInputScreen (위저드)', () => {
       expect.objectContaining({
         roomType: 'ONE_AND_HALF',
         area: 9,
+        builtYear: 2018,
         direction: 'SOUTH',
         waterPressure: 3,
         hasElevator: true,

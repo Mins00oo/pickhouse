@@ -11,6 +11,7 @@ import { House, HouseStackParamList, Photo } from '@/types';
 import { colors, spacing, typography } from '@/theme';
 import { photosRepo } from '@/db/photos.repo';
 import {
+  builtYearLabel,
   CONDITION_KEYS,
   CONDITION_META,
   conditionColor,
@@ -101,7 +102,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
 
         <AnchorDistanceCard house={house} />
 
-        {(house.area || house.floor || house.rooms || house.roomType || house.floorType) && (
+        {(house.area || house.floor || house.rooms || house.roomType || house.floorType || house.builtYear) && (
           <Card>
             <Text style={typography.caption}>구조</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm }}>
@@ -110,6 +111,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
               {floorText ? <Pill text={floorText} /> : null}
               {house.rooms ? <Pill text={`방 ${house.rooms}`} /> : null}
               {house.bathrooms ? <Pill text={`욕실 ${house.bathrooms}`} /> : null}
+              {house.builtYear ? <Pill text={builtYearLabel(house.builtYear)} /> : null}
             </View>
           </Card>
         )}

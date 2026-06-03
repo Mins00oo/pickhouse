@@ -39,6 +39,7 @@ import { TriStateRow } from './components/wizard/TriStateRow';
 import { SwitchRow } from './components/wizard/SwitchRow';
 import { AmountInput } from './components/wizard/AmountInput';
 import { PyeongInput } from './components/wizard/PyeongInput';
+import { BuiltYearInput } from './components/wizard/BuiltYearInput';
 import { FloorTypeInput } from './components/wizard/FloorTypeInput';
 import { DirectionPicker } from './components/wizard/DirectionPicker';
 import { Field, FieldLabel } from './components/wizard/FieldLabel';
@@ -69,6 +70,7 @@ interface WizardForm {
   utilityEstimates: Partial<Record<SeparateUtility, string>>;
   roomType?: RoomType;
   area: string;
+  builtYear: string;
   floorType: FloorType;
   floor: string;
   totalFloor: string;
@@ -95,6 +97,7 @@ const INITIAL: WizardForm = {
   utilityEstimates: {},
   roomType: undefined,
   area: '',
+  builtYear: '',
   floorType: 'GROUND',
   floor: '',
   totalFloor: '',
@@ -155,6 +158,7 @@ export function HouseInputScreen({ navigation, route }: Props) {
       utilityEstimates: estimates,
       roomType: editingHouse.roomType,
       area: editingHouse.area == null ? '' : String(editingHouse.area),
+      builtYear: editingHouse.builtYear == null ? '' : String(editingHouse.builtYear),
       floorType: editingHouse.floorType ?? (editingHouse.floor != null ? 'GROUND' : 'GROUND'),
       floor: editingHouse.floor == null ? '' : String(editingHouse.floor),
       totalFloor: editingHouse.totalFloor == null ? '' : String(editingHouse.totalFloor),
@@ -236,6 +240,7 @@ export function HouseInputScreen({ navigation, route }: Props) {
       rent: form.dealType === 'JEONSE' ? undefined : (intOrUndef(form.rent) ?? 0),
       maintenanceFee: intOrUndef(form.maintenanceFee),
       area: form.area ? Number(form.area) : undefined,
+      builtYear: intOrUndef(form.builtYear),
       floor: form.floorType === 'GROUND' ? intOrUndef(form.floor) : undefined,
       totalFloor: intOrUndef(form.totalFloor),
       hasElevator: form.facilities.hasElevator,
@@ -483,6 +488,10 @@ export function HouseInputScreen({ navigation, route }: Props) {
                   onChangeFloor={(t) => set('floor', t)}
                   onChangeTotal={(t) => set('totalFloor', t)}
                 />
+              </Field>
+              <Field>
+                <FieldLabel hint="연식 확인용">건축연도</FieldLabel>
+                <BuiltYearInput value={form.builtYear} onChange={(t) => set('builtYear', t)} />
               </Field>
               <Field>
                 <FieldLabel hint="햇빛과 직결돼요">향</FieldLabel>
