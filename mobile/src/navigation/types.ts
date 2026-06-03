@@ -16,6 +16,7 @@ export type HouseStackParamList = {
   HouseDetail: { houseId: string };
   Places: undefined;
   AddPlace: { placeId?: string } | undefined;
+  CompareResult: { aId: string; bId: string };
 };
 
 declare global {

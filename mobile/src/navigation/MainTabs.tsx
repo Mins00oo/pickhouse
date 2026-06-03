@@ -4,7 +4,8 @@ import { HomeMapScreen } from '@/screens/home/HomeMapScreen';
 import { HouseDetailScreen } from '@/screens/houses/HouseDetailScreen';
 import { HouseInputScreen } from '@/screens/houses/HouseInputScreen';
 import { HouseListScreen } from '@/screens/houses/HouseListScreen';
-import { ComparePlaceholderScreen } from '@/screens/compare/ComparePlaceholderScreen';
+import { ComparePickerScreen } from '@/screens/compare/ComparePickerScreen';
+import { CompareResultScreen } from '@/screens/compare/CompareResultScreen';
 import { MyScreen } from '@/screens/my/MyScreen';
 import { PlacesListScreen } from '@/screens/places/PlacesListScreen';
 import { AddPlaceScreen } from '@/screens/places/AddPlaceScreen';
@@ -30,6 +31,7 @@ export function MainTabs() {
       <Stack.Screen name="HouseDetail" component={HouseDetailScreen} options={{ title: '집 상세' }} />
       <Stack.Screen name="Places" component={PlacesListScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AddPlace" component={AddPlaceScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CompareResult" component={CompareResultScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -49,7 +51,7 @@ function BottomTabs() {
       <Tab.Screen name="Map" component={HomeMapScreen} options={{ title: '지도' }} />
       <Tab.Screen name="List" component={HouseListScreen} options={{ title: '목록' }} />
       <Tab.Screen name="AddHouseTab" component={AddHousePlaceholder} options={{ title: '집 추가' }} />
-      <Tab.Screen name="Compare" component={ComparePlaceholderScreen} options={{ title: '비교' }} />
+      <Tab.Screen name="Compare" component={ComparePickerScreen} options={{ title: '비교' }} />
       <Tab.Screen name="My" component={MyScreen} options={{ title: '마이' }} />
     </Tab.Navigator>
   );

@@ -87,9 +87,8 @@ describe('HouseDetailScreen', () => {
     expect(getByText('컨디션')).toBeTruthy();
     expect(getByText('1.5룸')).toBeTruthy();
     expect(getByText('3/5층')).toBeTruthy();
-    expect(getByText('남향')).toBeTruthy();
-    expect(getByText('좋음')).toBeTruthy(); // sunlight=3
-    expect(getByText('나쁨')).toBeTruthy(); // moisture=1
+    expect(getByText('남향')).toBeTruthy(); // 햇빛 = 향(direction) 으로 표시
+    expect(getByText('있음')).toBeTruthy(); // moisture=1 → 곰팡이 있음
   });
 
   it('shows the anchor distance stat when a workplace is registered', async () => {

@@ -110,7 +110,7 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.press(getByTestId('add-step-tab-구조'));
     expect(getByTestId('pyeong-input')).toBeTruthy();
     fireEvent.press(getByTestId('add-step-tab-체크'));
-    expect(getByTestId('condition-햇빛-좋음')).toBeTruthy();
+    expect(getByTestId('condition-수압-좋음')).toBeTruthy();
   });
 
   it('dealType toggle swaps the price inputs (전세 hides 월세)', () => {
@@ -250,9 +250,10 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.press(getByTestId('add-step-tab-구조'));
     fireEvent.press(getByTestId('roomtype-1.5룸'));
     fireEvent.press(getByTestId('pyeong-preset-9'));
+    fireEvent.changeText(getByTestId('builtyear-input'), '2018');
     fireEvent.press(getByTestId('direction-남향'));
     fireEvent.press(getByTestId('add-step-tab-체크'));
-    fireEvent.press(getByTestId('condition-햇빛-좋음'));
+    fireEvent.press(getByTestId('condition-수압-좋음'));
     fireEvent.press(getByTestId('switch-엘리베이터'));
     fireEvent.press(getByTestId('save-button'));
 
@@ -261,8 +262,9 @@ describe('HouseInputScreen (위저드)', () => {
       expect.objectContaining({
         roomType: 'ONE_AND_HALF',
         area: 9,
+        builtYear: 2018,
         direction: 'SOUTH',
-        sunlight: 3,
+        waterPressure: 3,
         hasElevator: true,
         floorType: 'GROUND',
       }),

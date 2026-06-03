@@ -42,7 +42,6 @@ import {
   filterHousesByRegion,
   formatHousePrice,
   formatHousePriceShort,
-  getDealTypeLabel,
   getHouseCoordinate,
   getHouseMeta,
   getHouseSubtitle,
@@ -51,6 +50,7 @@ import {
   type MapCoordinate,
   type MapRegion,
 } from '@/screens/houses/houseMapUtils';
+import { dealTypeLabel, directionColorLevel } from '@/domain/house';
 import { conditionColor, radii, spacing, typography } from '@/theme';
 import { PRETENDARD_BOLD, PRETENDARD_EXTRABOLD } from '@/theme/fonts';
 import { House } from '@/types';
@@ -547,7 +547,7 @@ function HomeNativeMarkers({
           // 모든 요소를 root 의 "직속 자식"으로 절대배치(라이브러리 문서 예시 구조) → 텍스트도 렌더된다.
           const isJeonse = item.house.dealType === 'JEONSE';
           const houseName = getHouseTitle(item.house);
-          const dealLabel = getMarkerDealTypeLabel(item.house);
+          const dealLabel = dealTypeLabel(item.house.dealType);
           const priceText = formatHousePriceShort(item.house).replace(/^전세\s*/, '');
           const cw = calloutWidth(houseName, priceText);
           return (
@@ -972,7 +972,7 @@ function HomeFullListRow({
     >
       <View style={[styles.fullListDealTile, active && styles.activeFullListDealTile]}>
         <Text style={[styles.fullListDealText, active && styles.activeFullListDealText]}>
-          {getMarkerDealTypeLabel(house).replace('세', '')}
+          {dealTypeLabel(house.dealType).replace('세', '')}
         </Text>
       </View>
 
@@ -1055,7 +1055,7 @@ function HomeHouseCard({
       <View style={styles.cardInfo}>
         <View style={styles.typeLine}>
           <Text style={[styles.dealBadge, house.dealType === 'JEONSE' && styles.jeonseBadge]}>
-            {getDealTypeLabel(house)}
+            {dealTypeLabel(house.dealType)}
           </Text>
           <Ionicons name="bookmark-outline" size={14} color={homeColors.muted} style={styles.cardBookmark} />
         </View>
@@ -1078,9 +1078,14 @@ function HomeHouseCard({
         <View style={styles.cardBottomRow}>
           <View style={styles.checkDots}>
             {CARD_CHECKS.map(({ key, icon }) => {
-              const value = house[key];
-              const color =
-                typeof value === 'number' ? conditionColor(value as 1 | 2 | 3) : homeColors.borderSoft;
+              // 햇빛은 향(direction)에서 색을 뽑고, 나머지는 저장된 1~3 컨디션 값으로.
+              const level =
+                key === 'sunlight'
+                  ? directionColorLevel(house.direction)
+                  : typeof house[key] === 'number'
+                    ? (house[key] as 1 | 2 | 3)
+                    : undefined;
+              const color = level ? conditionColor(level) : homeColors.borderSoft;
               return <Ionicons key={key} name={icon as never} size={13} color={color} />;
             })}
           </View>
@@ -1223,8 +1228,8 @@ function FilterSheet({
               <View style={styles.segmented}>
                 {[
                   { key: 'ALL' as const, label: '전체', testID: 'filter-deal-all' },
-                  { key: 'WOLSE' as const, label: '월세', testID: 'filter-deal-wolse' },
-                  { key: 'JEONSE' as const, label: '전세', testID: 'filter-deal-jeonse' },
+                  { key: 'WOLSE' as const, label: dealTypeLabel('WOLSE'), testID: 'filter-deal-wolse' },
+                  { key: 'JEONSE' as const, label: dealTypeLabel('JEONSE'), testID: 'filter-deal-jeonse' },
                 ].map((item) => {
                   const active = draftFilter.dealType === item.key;
                   return (
@@ -1549,12 +1554,6 @@ function SelectedCallout({
       <View collapsable={false} style={[styles.calloutTail, { left: width / 2 - 7 }]} />
     </View>
   );
-}
-
-function getMarkerDealTypeLabel(house: House): string {
-  if (house.dealType === 'JEONSE') return '전세';
-  if (house.dealType === 'BAN_JEONSE') return '반전세';
-  return '월세';
 }
 
 function getAverageCoordinate(houses: House[]): MapCoordinate | null {

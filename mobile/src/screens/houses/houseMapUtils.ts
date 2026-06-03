@@ -1,4 +1,5 @@
 import { AnchorDistance, AnchorPlace, House } from '@/types';
+import { dealTypeLabel } from '@/domain/house';
 
 export type MapCoordinate = {
   latitude: number;
@@ -106,9 +107,7 @@ export function getHouseSubtitle(house: House): string {
 }
 
 export function getDealTypeLabel(house: House): string {
-  if (house.dealType === 'JEONSE') return '전세';
-  if (house.dealType === 'BAN_JEONSE') return '반전세';
-  return '월세';
+  return dealTypeLabel(house.dealType);
 }
 
 export function formatHousePrice(house: House): string {
