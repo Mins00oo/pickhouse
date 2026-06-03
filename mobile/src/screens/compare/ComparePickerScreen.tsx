@@ -13,9 +13,8 @@ import {
   formatHousePriceShort,
   getHouseTitle,
 } from '@/screens/houses/houseMapUtils';
-import { roomTypeLabel } from '@/screens/houses/wizardConstants';
+import { dealTypeShortLabel, roomTypeLabel } from '@/domain/house';
 import { CompareTopBar } from './components/CompareTopBar';
-import { dealTypeShort } from './compareUtils';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Compare'>;
 
@@ -78,7 +77,7 @@ export function ComparePickerScreen({ navigation }: Props) {
                 </Pressable>
                 <View style={[styles.dealBadge, { backgroundColor: isJeonse ? colors.primarySoft : '#FCEFE7' }]}>
                   <Text style={[styles.dealText, { color: isJeonse ? colors.primary : colors.coral }]}>
-                    {dealTypeShort(house)}
+                    {dealTypeShortLabel(house.dealType)}
                   </Text>
                 </View>
                 <View>
@@ -153,7 +152,7 @@ function HouseRow({
         <View style={styles.rowTitleLine}>
           <View style={[styles.dealBadgeSm, { backgroundColor: isJeonse ? colors.primarySoft : '#FCEFE7' }]}>
             <Text style={[styles.dealTextSm, { color: isJeonse ? colors.primary : colors.coral }]}>
-              {dealTypeShort(house)}
+              {dealTypeShortLabel(house.dealType)}
             </Text>
           </View>
           <Text style={styles.rowName} numberOfLines={1}>

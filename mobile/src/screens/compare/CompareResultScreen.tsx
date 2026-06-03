@@ -9,12 +9,8 @@ import { useHouseCommute } from '@/queries/anchorDistances.queries';
 import { House } from '@/types';
 import { colors } from '@/theme';
 import { getDisplayHouses } from '@/screens/houses/houseSampleData';
-import {
-  formatDepositShort,
-  getDealTypeLabel,
-  pickPrimaryAnchors,
-} from '@/screens/houses/houseMapUtils';
-import { roomTypeLabel } from '@/screens/houses/wizardConstants';
+import { formatDepositShort, pickPrimaryAnchors } from '@/screens/houses/houseMapUtils';
+import { dealTypeLabel, FACILITY_META, roomTypeLabel } from '@/domain/house';
 import { CompareTopBar } from './components/CompareTopBar';
 import { CompareHeader } from './components/CompareHeader';
 import { SectionLabel } from './components/SectionLabel';
@@ -158,9 +154,9 @@ function Summary({
 
       {/* 시설 — 있음/없음 대조 */}
       <View style={[styles.card, styles.cardGap]}>
-        <FacilityCompareRow label="엘베" la={a.hasElevator} rb={b.hasElevator} />
-        <FacilityCompareRow label="주차" la={a.hasParking} rb={b.hasParking} />
-        <FacilityCompareRow label="풀옵션" la={a.fullOption} rb={b.fullOption} />
+        <FacilityCompareRow label={FACILITY_META.hasElevator.shortLabel} la={a.hasElevator} rb={b.hasElevator} />
+        <FacilityCompareRow label={FACILITY_META.hasParking.shortLabel} la={a.hasParking} rb={b.hasParking} />
+        <FacilityCompareRow label={FACILITY_META.fullOption.shortLabel} la={a.fullOption} rb={b.fullOption} />
       </View>
     </ScrollView>
   );
@@ -186,7 +182,7 @@ function FullTable({
   return (
     <ScrollView style={styles.bodyScroll} contentContainerStyle={styles.fullContent}>
       <SectionLabel icon="home">가격</SectionLabel>
-      <CompareRow label="거래" left={getDealTypeLabel(a)} right={getDealTypeLabel(b)} />
+      <CompareRow label="거래" left={dealTypeLabel(a.dealType)} right={dealTypeLabel(b.dealType)} />
       <CompareRow label="보증금" left={formatDepositShort(a.deposit)} right={formatDepositShort(b.deposit)} />
       {a.dealType !== 'JEONSE' ? (
         <CompareRow
@@ -212,9 +208,9 @@ function FullTable({
       <ConditionRows a={a} b={b} />
 
       <SectionLabel icon="layers">시설</SectionLabel>
-      <FacilityRow label="엘베" la={a.hasElevator} rb={b.hasElevator} />
-      <FacilityRow label="주차" la={a.hasParking} rb={b.hasParking} />
-      <FacilityRow label="풀옵션" la={a.fullOption} rb={b.fullOption} />
+      <FacilityRow label={FACILITY_META.hasElevator.shortLabel} la={a.hasElevator} rb={b.hasElevator} />
+      <FacilityRow label={FACILITY_META.hasParking.shortLabel} la={a.hasParking} rb={b.hasParking} />
+      <FacilityRow label={FACILITY_META.fullOption.shortLabel} la={a.fullOption} rb={b.fullOption} />
 
       {hasWork || hasSchool ? <SectionLabel icon="navigate">통근</SectionLabel> : null}
       {hasWork ? (

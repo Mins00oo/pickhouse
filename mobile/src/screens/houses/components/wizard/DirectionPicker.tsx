@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 import { Direction } from '@/types';
-import { DIRECTION_OPTIONS } from '../../wizardConstants';
+import { DIRECTION_OPTIONS } from '@/domain/house';
 
 export interface DirectionPickerProps {
   value?: Direction;

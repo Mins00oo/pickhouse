@@ -8,10 +8,20 @@ import { Button } from '@/components/Button';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { useHouse, useDeleteHouse } from '@/queries/houses.queries';
 import { House, HouseStackParamList, Photo } from '@/types';
-import { colors, conditionColor, conditionLabel, spacing, typography } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 import { photosRepo } from '@/db/photos.repo';
-import { CONDITION_KEYS, CONDITION_META, normalizeConditionLevel } from './conditionMeta';
-import { directionLabel, roomTypeLabel } from './wizardConstants';
+import {
+  CONDITION_KEYS,
+  CONDITION_META,
+  conditionColor,
+  conditionValueLabel,
+  dealTypeLabel,
+  directionColorLevel,
+  directionLabel,
+  floorTypeLabel,
+  normalizeConditionLevel,
+  roomTypeLabel,
+} from '@/domain/house';
 import { AnchorDistanceCard } from './components/AnchorDistanceCard';
 
 type Props = NativeStackScreenProps<HouseStackParamList, 'HouseDetail'>;
@@ -36,7 +46,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
 
   function priceLabel(): string {
     if (!house) return '';
-    if (house.dealType === 'JEONSE') return `전세 ${house.deposit.toLocaleString()} 만원`;
+    if (house.dealType === 'JEONSE') return `${dealTypeLabel('JEONSE')} ${house.deposit.toLocaleString()} 만원`;
     return `보증금 ${house.deposit.toLocaleString()} / 월세 ${house.rent?.toLocaleString() ?? 0} 만원`;
   }
 
@@ -54,7 +64,10 @@ export function HouseDetailScreen({ route, navigation }: Props) {
     ]);
   }
 
-  const presentConditions = CONDITION_KEYS.filter((k) => typeof house[k] === 'number');
+  // 햇빛은 향(direction)으로 표시하므로 direction 유무로 판단. 나머지는 저장된 1~3 값 유무.
+  const presentConditions = CONDITION_KEYS.filter((k) =>
+    k === 'sunlight' ? Boolean(house.direction) : typeof house[k] === 'number',
+  );
   const floorText = floorLabel(house);
 
   return (
@@ -88,12 +101,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
 
         <AnchorDistanceCard house={house} />
 
-        {(house.area ||
-          house.floor ||
-          house.rooms ||
-          house.roomType ||
-          house.floorType ||
-          house.direction) && (
+        {(house.area || house.floor || house.rooms || house.roomType || house.floorType) && (
           <Card>
             <Text style={typography.caption}>구조</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm }}>
@@ -102,7 +110,6 @@ export function HouseDetailScreen({ route, navigation }: Props) {
               {floorText ? <Pill text={floorText} /> : null}
               {house.rooms ? <Pill text={`방 ${house.rooms}`} /> : null}
               {house.bathrooms ? <Pill text={`욕실 ${house.bathrooms}`} /> : null}
-              {house.direction ? <Pill text={directionLabel(house.direction) ?? ''} /> : null}
             </View>
           </Card>
         )}
@@ -111,7 +118,14 @@ export function HouseDetailScreen({ route, navigation }: Props) {
           <Card>
             <Text style={typography.caption}>컨디션</Text>
             {presentConditions.map((k) => {
-              const lvl = normalizeConditionLevel(house[k] as number);
+              // 햇빛 = 향(남향/북향…) 텍스트, 색은 향→레벨 매핑. 나머지는 항목별 단어.
+              const isSun = k === 'sunlight';
+              const lvl = isSun
+                ? directionColorLevel(house.direction)
+                : normalizeConditionLevel(house[k] as number);
+              const valueText = isSun
+                ? (directionLabel(house.direction) ?? '—')
+                : conditionValueLabel(k, lvl);
               return (
                 <View
                   key={k}
@@ -121,9 +135,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
                     <Ionicons name={CONDITION_META[k].icon as never} size={16} color={conditionColor(lvl)} />
                     <Text style={typography.body}>{CONDITION_META[k].label}</Text>
                   </View>
-                  <Text style={[typography.bodyBold, { color: conditionColor(lvl) }]}>
-                    {conditionLabel(lvl)}
-                  </Text>
+                  <Text style={[typography.bodyBold, { color: conditionColor(lvl) }]}>{valueText}</Text>
                 </View>
               );
             })}
@@ -164,8 +176,10 @@ export function HouseDetailScreen({ route, navigation }: Props) {
 }
 
 function floorLabel(h: House): string | null {
-  if (h.floorType === 'SEMI_BASEMENT') return '반지하';
-  if (h.floorType === 'ROOFTOP') return '옥탑';
+  // 반지하/옥탑은 층 유형 라벨로(숫자 층 대신). 지상은 N/M층.
+  if (h.floorType === 'SEMI_BASEMENT' || h.floorType === 'ROOFTOP') {
+    return floorTypeLabel(h.floorType) ?? null;
+  }
   if (h.floor != null) return h.totalFloor != null ? `${h.floor}/${h.totalFloor}층` : `${h.floor}층`;
   return null;
 }

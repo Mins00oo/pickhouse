@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 import { colors } from '@/theme';
 import { FloorType } from '@/types';
-import { FLOOR_TYPE_OPTIONS } from '../../wizardConstants';
+import { FLOOR_TYPE_OPTIONS } from '@/domain/house';
 import { SegmentedControl } from './SegmentedControl';
 import { NumericInput } from './NumericInput';
 

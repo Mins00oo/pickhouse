@@ -1,15 +1,16 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { House } from '@/types';
-import { colors, conditionColor } from '@/theme';
+import { colors } from '@/theme';
 import {
   CONDITION_KEYS,
   CONDITION_META,
   ConditionKey,
+  conditionColor,
   conditionValueLabel,
+  directionColorLevel,
+  directionLabel,
   normalizeConditionLevel,
-} from '@/screens/houses/conditionMeta';
-import { directionColorLevel } from '../compareUtils';
-import { directionLabel } from '@/screens/houses/wizardConstants';
+} from '@/domain/house';
 
 /**
  * 컨디션 한 줄 — 항목별 실제 값(햇빛=향, 곰팡이=없음 …) + 색.

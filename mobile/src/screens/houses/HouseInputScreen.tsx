@@ -21,8 +21,17 @@ import {
   RoomType,
 } from '@/types';
 import { colors } from '@/theme';
-import { CONDITION_KEYS, CONDITION_META, ConditionKey, normalizeConditionLevel } from './conditionMeta';
-import { MAINTENANCE_OPTIONS, ROOM_TYPE_OPTIONS } from './wizardConstants';
+import {
+  CONDITION_META,
+  FACILITY_KEYS,
+  FACILITY_META,
+  INPUT_CONDITION_KEYS,
+  InputConditionKey,
+  MAINTENANCE_OPTIONS,
+  normalizeConditionLevel,
+  ROOM_TYPE_OPTIONS,
+  WIZARD_DEAL_OPTIONS,
+} from '@/domain/house';
 import { StepTabs } from './components/wizard/StepTabs';
 import { SegmentedControl } from './components/wizard/SegmentedControl';
 import { Chips } from './components/wizard/Chips';
@@ -64,7 +73,7 @@ interface WizardForm {
   floor: string;
   totalFloor: string;
   direction?: Direction;
-  cond: Partial<Record<ConditionKey, 1 | 2 | 3>>;
+  cond: Partial<Record<InputConditionKey, 1 | 2 | 3>>;
   facilities: { hasElevator: boolean; hasParking: boolean; fullOption: boolean };
   memo: string;
 }
@@ -151,7 +160,6 @@ export function HouseInputScreen({ navigation, route }: Props) {
       totalFloor: editingHouse.totalFloor == null ? '' : String(editingHouse.totalFloor),
       direction: editingHouse.direction,
       cond: {
-        sunlight: normalizeConditionLevel(editingHouse.sunlight),
         waterPressure: normalizeConditionLevel(editingHouse.waterPressure),
         moisture: normalizeConditionLevel(editingHouse.moisture),
         noise: normalizeConditionLevel(editingHouse.noise),
@@ -241,7 +249,6 @@ export function HouseInputScreen({ navigation, route }: Props) {
       maintenanceIncludes: includedCodes.length ? includedCodes : undefined,
       utilityEstimates: Object.keys(estimates).length ? estimates : undefined,
       fullOption: form.facilities.fullOption,
-      sunlight: form.cond.sunlight,
       waterPressure: form.cond.waterPressure,
       moisture: form.cond.moisture,
       noise: form.cond.noise,
@@ -307,10 +314,10 @@ export function HouseInputScreen({ navigation, route }: Props) {
                 <FieldLabel required>거래 유형</FieldLabel>
                 <SegmentedControl
                   testIDPrefix="dealtype"
-                  options={['월세', '전세']}
-                  value={form.dealType === 'WOLSE' ? 0 : 1}
+                  options={WIZARD_DEAL_OPTIONS.map((o) => o.label)}
+                  value={WIZARD_DEAL_OPTIONS.findIndex((o) => o.code === form.dealType)}
                   onChange={(i) => {
-                    const next: WizardDealType = i === 0 ? 'WOLSE' : 'JEONSE';
+                    const next: WizardDealType = WIZARD_DEAL_OPTIONS[i]!.code;
                     setForm((f) => ({ ...f, dealType: next, rent: next === 'JEONSE' ? '' : f.rent }));
                   }}
                 />
@@ -489,7 +496,7 @@ export function HouseInputScreen({ navigation, route }: Props) {
               <Field>
                 <FieldLabel hint="보면서 느낀 점을 빠르게">컨디션 체크</FieldLabel>
                 <View style={{ gap: 7 }}>
-                  {CONDITION_KEYS.map((k) => (
+                  {INPUT_CONDITION_KEYS.map((k) => (
                     <TriStateRow
                       key={k}
                       icon={CONDITION_META[k].icon}
@@ -503,39 +510,20 @@ export function HouseInputScreen({ navigation, route }: Props) {
               <Field>
                 <FieldLabel>시설</FieldLabel>
                 <View style={{ gap: 7 }}>
-                  <SwitchRow
-                    icon="git-network-outline"
-                    label="엘리베이터"
-                    value={form.facilities.hasElevator}
-                    onToggle={() =>
-                      setForm((f) => ({
-                        ...f,
-                        facilities: { ...f.facilities, hasElevator: !f.facilities.hasElevator },
-                      }))
-                    }
-                  />
-                  <SwitchRow
-                    icon="car-outline"
-                    label="주차 가능"
-                    value={form.facilities.hasParking}
-                    onToggle={() =>
-                      setForm((f) => ({
-                        ...f,
-                        facilities: { ...f.facilities, hasParking: !f.facilities.hasParking },
-                      }))
-                    }
-                  />
-                  <SwitchRow
-                    icon="home-outline"
-                    label="풀옵션"
-                    value={form.facilities.fullOption}
-                    onToggle={() =>
-                      setForm((f) => ({
-                        ...f,
-                        facilities: { ...f.facilities, fullOption: !f.facilities.fullOption },
-                      }))
-                    }
-                  />
+                  {FACILITY_KEYS.map((key) => (
+                    <SwitchRow
+                      key={key}
+                      icon={FACILITY_META[key].icon}
+                      label={FACILITY_META[key].label}
+                      value={form.facilities[key]}
+                      onToggle={() =>
+                        setForm((f) => ({
+                          ...f,
+                          facilities: { ...f.facilities, [key]: !f.facilities[key] },
+                        }))
+                      }
+                    />
+                  ))}
                 </View>
               </Field>
               <Field>

@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { House } from '@/types';
 import { colors } from '@/theme';
 import { formatHousePriceShort, getHouseTitle } from '@/screens/houses/houseMapUtils';
-import { COMPARE_COLOR_A, COMPARE_COLOR_B, CompareSide, dealTypeShort } from '../compareUtils';
+import { dealTypeShortLabel } from '@/domain/house';
+import { COMPARE_COLOR_A, COMPARE_COLOR_B, CompareSide } from '../compareUtils';
 
 /** 두 집 헤더 — [1fr 40px 1fr]. 가운데 VS, 이름 옆 집 색 점. (사진은 placeholder 블록) */
 export function CompareHeader({ a, b }: { a: House; b: House }) {
@@ -36,7 +37,7 @@ function Cell({ house, side }: { house: House; side: CompareSide }) {
           ]}
         >
           <Text style={[styles.dealText, { color: isJeonse ? colors.primary : colors.coral }]}>
-            {dealTypeShort(house)}
+            {dealTypeShortLabel(house.dealType)}
           </Text>
         </View>
       </View>
