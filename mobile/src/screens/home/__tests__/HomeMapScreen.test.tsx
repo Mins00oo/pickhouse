@@ -135,11 +135,12 @@ afterEach(() => {
 
 describe('HomeMapScreen', () => {
   it('shows sample houses on the home map when the account has no records', async () => {
-    const { findByText, getByPlaceholderText, getByTestId, queryByText } = renderHome([]);
+    const { findByText, findAllByText, getByPlaceholderText, getByTestId, queryByText } = renderHome([]);
 
     expect(getByTestId('house-map-view')).toBeTruthy();
     expect(getByPlaceholderText('장소, 지명, 집 이름 검색')).toBeTruthy();
-    expect(await findByText('청파동 빌라')).toBeTruthy();
+    // 첫 집은 카드 + 선택 콜아웃 양쪽에 이름이 뜨므로 findAll 로 ≥1 확인.
+    expect((await findAllByText('청파동 빌라')).length).toBeGreaterThan(0);
     expect(await findByText('이 근처 내 집')).toBeTruthy();
     expect(await findByText('7')).toBeTruthy();
     expect(getByTestId('home-house-marker-sample-1')).toBeTruthy();
@@ -147,16 +148,16 @@ describe('HomeMapScreen', () => {
   });
 
   it('does not mix sample houses when real records exist', async () => {
-    const { findByText, queryByText } = renderHome([nearbyHouse]);
+    const { findAllByText, queryByText } = renderHome([nearbyHouse]);
 
-    expect(await findByText('망원 소형집')).toBeTruthy();
+    expect((await findAllByText('망원 소형집')).length).toBeGreaterThan(0);
     expect(queryByText('청파동 빌라')).toBeNull();
   });
 
   it('lets the native map keep gesture control by using initialCamera instead of a controlled camera prop', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
 
     expect(getByTestId('house-map-view').props.initialCamera).toEqual(
       expect.objectContaining({ latitude: 37.5563, longitude: 126.9236, zoom: 14 }),
@@ -169,7 +170,7 @@ describe('HomeMapScreen', () => {
     const { __naverMapMock } = jest.requireMock('@mj-studio/react-native-naver-map');
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
     __naverMapMock.animateCameraTo.mockClear();
 
@@ -195,9 +196,9 @@ describe('HomeMapScreen', () => {
 
   it('rebuilds the carousel from houses inside the current map viewport after camera idle', async () => {
     jest.useFakeTimers();
-    const { findByText, getByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
+    const { findByText, findAllByText, getByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     expect(await findByText('역삼 오피스텔')).toBeTruthy();
 
     fireEvent(getByTestId('house-map-view'), 'onCameraIdle', {
@@ -217,14 +218,14 @@ describe('HomeMapScreen', () => {
     });
 
     await waitFor(() => expect(queryByText('역삼 오피스텔')).toBeNull());
-    expect(await findByText('망원 소형집')).toBeTruthy();
+    expect((await findAllByText('망원 소형집')).length).toBeGreaterThan(0);
   });
 
   it('moves the native map camera when the current location button is pressed', async () => {
     const { __naverMapMock } = jest.requireMock('@mj-studio/react-native-naver-map');
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
     __naverMapMock.animateCameraTo.mockClear();
 
@@ -239,7 +240,7 @@ describe('HomeMapScreen', () => {
     const { __naverMapMock } = jest.requireMock('@mj-studio/react-native-naver-map');
     const { findByText } = renderHome([]);
 
-    await findByText('청파동 빌라');
+    await findByText('이 근처 내 집');
     await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
 
     expect(__naverMapMock.animateCameraTo).not.toHaveBeenCalled();
@@ -249,7 +250,7 @@ describe('HomeMapScreen', () => {
     const { __naverMapMock } = jest.requireMock('@mj-studio/react-native-naver-map');
     const { findByText, getByTestId } = renderHome([]);
 
-    await findByText('청파동 빌라');
+    await findByText('이 근처 내 집');
     await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
     fireEvent.press(getByTestId('home-current-location-button'));
 
@@ -261,7 +262,7 @@ describe('HomeMapScreen', () => {
   it('uses a calmer basic map tone with the design search/layers controls', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
 
     expect(getByTestId('house-map-view').props.mapType).toBe('Basic');
     expect(getByTestId('house-map-view').props.lightness).toBe(0.06);
@@ -274,7 +275,7 @@ describe('HomeMapScreen', () => {
   it('toggles the map type from the layers button', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     expect(getByTestId('house-map-view').props.mapType).toBe('Basic');
     fireEvent.press(getByTestId('home-layers-button'));
     expect(getByTestId('house-map-view').props.mapType).toBe('Satellite');
@@ -283,25 +284,26 @@ describe('HomeMapScreen', () => {
   it('renders a custom current location marker instead of the native location overlay', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     await waitFor(() => expect(getByTestId('home-current-location-marker')).toBeTruthy());
 
     expect(getByTestId('house-map-view').props.locationOverlay).toBeUndefined();
   });
 
-  it('renders the selected house as a tight two-line callout (icon + 거래유형/가격 in-view) and teardrop pins for the rest', async () => {
+  it('renders the selected house as a three-line callout (집 이름/거래유형/가격 in-view) and teardrop pins for the rest', async () => {
     const { findByText, getByTestId, getByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
 
     await waitFor(() => expect(getByTestId('home-house-marker-near')).toBeTruthy());
     expect(getByTestId('home-house-marker-near').props.latitude).toBe(37.556);
     expect(getByTestId('home-house-marker-near').props.longitude).toBe(126.901);
-    // 콜아웃은 내용에 맞춰 컴팩트(고정 168 아님) + 텍스트는 in-view(직속 자식), caption 미사용.
-    expect(getByTestId('home-house-marker-near').props.height).toBe(50);
+    // 콜아웃은 3줄(이름/거래유형/가격) — 캔버스 높이 70, 텍스트는 in-view(직속 자식), caption 미사용.
+    expect(getByTestId('home-house-marker-near').props.height).toBe(70);
     expect(getByTestId('home-house-marker-near').props.width).toBeGreaterThan(90);
-    expect(getByTestId('home-house-marker-near').props.width).toBeLessThan(140);
+    expect(getByTestId('home-house-marker-near').props.width).toBeLessThan(160);
     expect(getByTestId('home-house-marker-near').props.caption).toBeUndefined();
+    expect(getByTestId('home-callout-name')).toHaveTextContent('망원 소형집'); // 집 이름 줄
     expect(getByText('1,000/50')).toBeTruthy(); // 가격 줄(공백 없는 포맷 → 마커 전용, 카드와 구분)
 
     // 미선택: 물방울 하우스 핀(텍스트 없음).
@@ -316,7 +318,7 @@ describe('HomeMapScreen', () => {
     __naverMapMock.coordinateToScreen.mockClear();
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
 
     expect(getByTestId('home-house-marker-near').props.latitude).toBe(37.556);
     expect(getByTestId('home-house-marker-near').props.longitude).toBe(126.901);
@@ -329,7 +331,7 @@ describe('HomeMapScreen', () => {
     __naverMapMock.coordinateToScreen.mockClear();
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
 
     fireEvent(getByTestId('house-map-view'), 'onCameraChanged', {
       latitude: 37.556,
@@ -354,7 +356,7 @@ describe('HomeMapScreen', () => {
   it('shows an icon count cluster without the word 매물 when zoomed out', async () => {
     const { findByText, getByTestId, queryByText } = renderHome([nearbyHouse, nearbySecondHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent(getByTestId('house-map-view'), 'onCameraIdle', {
       latitude: 37.556,
       longitude: 126.901,
@@ -378,7 +380,7 @@ describe('HomeMapScreen', () => {
   it('moves the active card border when the carousel settles on another house', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     expect(getByTestId('home-house-card-near')).toHaveStyle({ borderColor: '#0E1A14' });
     expect(getByTestId('home-house-card-outside')).toHaveStyle({ borderColor: '#EFEDE5' });
 
@@ -393,7 +395,7 @@ describe('HomeMapScreen', () => {
   it('selects the matching card when a map marker is tapped', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-house-marker-outside'));
 
     expect(getByTestId('home-house-card-near')).toHaveStyle({ borderColor: '#EFEDE5' });
@@ -403,7 +405,7 @@ describe('HomeMapScreen', () => {
   it('switches from map mode to an opaque full-screen list mode and back', async () => {
     const { findByText, getByText, getByTestId, queryByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     expect(queryByText('목록 보기')).toBeNull();
     expect(queryByText('지도 보기')).toBeNull();
     fireEvent.press(getByText('목록'));
@@ -427,7 +429,7 @@ describe('HomeMapScreen', () => {
   it('shows the card sheet (not the full list) in map mode', async () => {
     const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     // 시트 드래그/스냅 동작은 @gorhom/bottom-sheet 가 담당하므로 구조만 검증한다
     expect(getByTestId('home-result-sheet')).toBeTruthy();
     expect(getByTestId('home-house-carousel')).toBeTruthy();
@@ -438,7 +440,7 @@ describe('HomeMapScreen', () => {
   it('shares search query between the map header and full list mode header', async () => {
     const { findByText, getByPlaceholderText, getByText, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.changeText(getByPlaceholderText('장소, 지명, 집 이름 검색'), '역삼');
     fireEvent.press(getByText('목록'));
 
@@ -460,7 +462,7 @@ describe('HomeMapScreen', () => {
   it('sorts current home results from the visible sort menu', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-sort-button'));
     fireEvent.press(getByTestId('home-sort-price-asc'));
 
@@ -487,7 +489,7 @@ describe('HomeMapScreen', () => {
     ]);
     const { findByText, queryByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     // 대중교통 추정은 API 없이 즉시 계산되어 카드에 "N분"이 뜬다.
     expect(await findByText(/\d+분/)).toBeTruthy();
     expect(queryByTestId('home-commute-register')).toBeNull();
@@ -496,7 +498,7 @@ describe('HomeMapScreen', () => {
   it('opens the filter sheet from the top filter button', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
 
     expect(await findByText('필터')).toBeTruthy();
@@ -504,9 +506,9 @@ describe('HomeMapScreen', () => {
   });
 
   it('applies a deal type filter from the filter sheet', async () => {
-    const { findByText, getByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
+    const { findByText, findAllByText, getByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
 
     fireEvent.press(getByTestId('filter-deal-jeonse'));
@@ -515,14 +517,14 @@ describe('HomeMapScreen', () => {
     fireEvent.press(getByTestId('filter-apply-button'));
 
     await waitFor(() => expect(queryByText('망원 소형집')).toBeNull());
-    expect(await findByText('역삼 오피스텔')).toBeTruthy();
+    expect((await findAllByText('역삼 오피스텔')).length).toBeGreaterThan(0);
     expect(getByTestId('home-filter-badge')).toHaveTextContent('1');
   });
 
   it('resets applied filters and clears the filter badge', async () => {
-    const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
+    const { findByText, findAllByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
     fireEvent.press(getByTestId('filter-deal-jeonse'));
     fireEvent.press(getByTestId('filter-apply-button'));
@@ -534,29 +536,29 @@ describe('HomeMapScreen', () => {
     expect(await findByText('2개 집 보기')).toBeTruthy();
     fireEvent.press(getByTestId('filter-apply-button'));
 
-    expect(await findByText('망원 소형집')).toBeTruthy();
+    expect((await findAllByText('망원 소형집')).length).toBeGreaterThan(0);
     expect(await findByText('역삼 오피스텔')).toBeTruthy();
     expect(queryByTestId('home-filter-badge')).toBeNull();
   });
 
   it('updates filter results from area chips before applying', async () => {
-    const { findByText, getByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
+    const { findByText, findAllByText, getByTestId, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
     fireEvent.press(getByTestId('filter-area-up-to-15'));
 
     expect(await findByText('1개 집 보기')).toBeTruthy();
     fireEvent.press(getByTestId('filter-apply-button'));
 
-    expect(await findByText('망원 소형집')).toBeTruthy();
+    expect((await findAllByText('망원 소형집')).length).toBeGreaterThan(0);
     await waitFor(() => expect(queryByText('역삼 오피스텔')).toBeNull());
   });
 
   it('hides monthly rent range and excludes it from the badge when jeonse is selected', async () => {
     const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
     fireEvent.press(getByTestId('filter-deal-jeonse'));
 
@@ -569,7 +571,7 @@ describe('HomeMapScreen', () => {
   it('locks filter body scroll while a range thumb is being dragged', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
 
     expect(getByTestId('filter-body').props.scrollEnabled).toBe(true);
@@ -586,7 +588,7 @@ describe('HomeMapScreen', () => {
   it('snaps the filter sheet between heights when the header is dragged', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
     expect(await findByText('필터')).toBeTruthy();
 
@@ -608,7 +610,7 @@ describe('HomeMapScreen', () => {
   it('does not close the filter sheet from content scrolling', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
     expect(await findByText('필터')).toBeTruthy();
 
@@ -622,7 +624,7 @@ describe('HomeMapScreen', () => {
   it('closes the filter sheet when the drag handle is pulled down far enough', async () => {
     const { findByText, getByTestId, queryByText } = renderHome([nearbyHouse]);
 
-    await findByText('망원 소형집');
+    await findByText('이 근처 내 집');
     fireEvent.press(getByTestId('home-filter-button'));
     expect(await findByText('필터')).toBeTruthy();
 

@@ -52,6 +52,7 @@ import {
   type MapRegion,
 } from '@/screens/houses/houseMapUtils';
 import { conditionColor, radii, spacing, typography } from '@/theme';
+import { PRETENDARD_BOLD, PRETENDARD_EXTRABOLD } from '@/theme/fonts';
 import { House } from '@/types';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Map'>;
@@ -98,14 +99,26 @@ const INDIVIDUAL_MARKER_MIN_ZOOM = 13;
 const PIN_WIDTH = 34; // 물방울 핀 너비
 const PIN_HEIGHT = 44; // 물방울 핀 높이(꼬리 포함)
 const CLUSTER_MARKER_SIZE = 46;
-const SELECTED_CALLOUT_HEIGHT = 50;
-const CALLOUT_TEXT_LEFT = 42; // 아이콘박스(좌10 + 24) + 간격8 → 좌우 여백 균형
+const CALLOUT_PILL_HEIGHT = 62; // 흰 알약 높이(3줄: 이름/거래유형/가격)
+const SELECTED_CALLOUT_HEIGHT = CALLOUT_PILL_HEIGHT + 8; // 꼬리(8) 포함 전체 캔버스 높이
+const CALLOUT_TEXT_LEFT = 42; // 아이콘박스(좌10 + 24) + 간격8
+const CALLOUT_RIGHT_PAD = 8; // 텍스트 오른쪽 여백(좌측 아이콘 여백 10과 시각 균형)
 const CURRENT_LOCATION_MARKER_SIZE = 44;
 
-// 선택 콜아웃 너비 — 아이콘 + 좌측정렬 2줄(가격 줄 기준)에 딱 맞게(야놀자식). 좌10/우12 대칭 여백. 클램프.
-function calloutWidth(priceText: string): number {
-  const textW = Math.max(Math.round(priceText.length * 7.2), 28);
-  return Math.min(Math.max(CALLOUT_TEXT_LEFT + textW + 12, 92), 184);
+// 선택 콜아웃 너비 — 아이콘 + 좌측정렬 3줄(이름/거래유형/가격) 중 가장 긴 줄에 맞춘다.
+// 글자 종류별 폭을 추정해 우측 여백이 과하게 벌어지지 않게 한다(공백·ASCII는 좁게).
+function estimateCalloutLine(text: string, fontSize: number): number {
+  let w = 0;
+  for (const ch of text) {
+    if (ch === ' ') w += fontSize * 0.3;
+    else if (ch.charCodeAt(0) < 0x80) w += fontSize * 0.56; // 숫자/영문/기호
+    else w += fontSize * 0.95; // 한글 등 전각(letterSpacing -0.3 감안)
+  }
+  return Math.ceil(w);
+}
+function calloutWidth(houseName: string, priceText: string): number {
+  const textW = Math.max(estimateCalloutLine(houseName, 12), estimateCalloutLine(priceText, 14), 36);
+  return Math.min(Math.max(CALLOUT_TEXT_LEFT + textW + CALLOUT_RIGHT_PAD, 92), 220);
 }
 type TestableMarkerProps = ComponentProps<typeof NaverMapMarkerOverlay> & { testID?: string };
 const TestableNaverMapMarkerOverlay = NaverMapMarkerOverlay as ComponentType<TestableMarkerProps>;
@@ -533,9 +546,10 @@ function HomeNativeMarkers({
           // 야놀자식 콜아웃: 흰 알약 + 코랄 집 아이콘 + 좌측정렬 2줄(거래유형 / 가격) + 꼬리.
           // 모든 요소를 root 의 "직속 자식"으로 절대배치(라이브러리 문서 예시 구조) → 텍스트도 렌더된다.
           const isJeonse = item.house.dealType === 'JEONSE';
+          const houseName = getHouseTitle(item.house);
           const dealLabel = getMarkerDealTypeLabel(item.house);
           const priceText = formatHousePriceShort(item.house).replace(/^전세\s*/, '');
-          const cw = calloutWidth(priceText);
+          const cw = calloutWidth(houseName, priceText);
           return (
             <TestableNaverMapMarkerOverlay
               key={item.house.id}
@@ -551,6 +565,7 @@ function HomeNativeMarkers({
             >
               <SelectedCallout
                 width={cw}
+                houseName={houseName}
                 dealLabel={dealLabel}
                 priceText={priceText}
                 labelColor={isJeonse ? homeColors.primary : homeColors.coral}
@@ -1498,26 +1513,37 @@ function ClusterPinShape() {
   return <View collapsable={false} style={styles.clusterCircle} />;
 }
 
-// 야놀자식 선택 콜아웃 — 흰 알약 + 코랄 집 아이콘 + 좌측정렬 2줄(거래유형/가격) + 코랄 꼬리.
-// iOS 스냅샷은 루트의 "직속 자식"만 안정적으로 그리므로(라이브러리 문서 예시 구조),
-// 배경·아이콘·꼬리(도형)와 2개의 텍스트를 모두 root 의 직속 자식으로 절대배치한다.
+// 선택 콜아웃 — 흰 알약 + 코랄 집 아이콘 + 좌측정렬 3줄(이름/거래유형/가격) + 코랄 꼬리.
+// iOS New Arch 스냅샷은 루트의 "직속 자식"만 안정적으로 그리므로(라이브러리 문서 예시 구조),
+// 배경·아이콘·꼬리(도형)와 3개의 텍스트를 모두 root 의 직속 자식으로 절대배치한다.
+// 텍스트엔 fontFamily 를 직접 지정 — 전역 패치/스냅샷에 의존하지 않고 Pretendard 로 캡처되게 한다.
 function SelectedCallout({
   width,
+  houseName,
   dealLabel,
   priceText,
   labelColor,
 }: {
   width: number;
+  houseName: string;
   dealLabel: string;
   priceText: string;
   labelColor: string;
 }) {
+  const textWidth = width - CALLOUT_TEXT_LEFT - 4;
   return (
-    <View key={`${dealLabel}/${priceText}/${width}`} collapsable={false} style={[styles.calloutRoot, { width }]}>
+    <View
+      key={`${houseName}/${dealLabel}/${priceText}/${width}`}
+      collapsable={false}
+      style={[styles.calloutRoot, { width }]}
+    >
       <View collapsable={false} style={[styles.calloutPillBg, { width }]} />
       <View collapsable={false} style={styles.calloutIconBox} />
       <View collapsable={false} style={styles.calloutHomeRoof} />
       <View collapsable={false} style={styles.calloutHomeBody} />
+      <Text testID="home-callout-name" numberOfLines={1} style={[styles.calloutName, { width: textWidth }]}>
+        {houseName}
+      </Text>
       <Text style={[styles.calloutLabel, { color: labelColor }]}>{dealLabel}</Text>
       <Text style={styles.calloutPriceText}>{priceText}</Text>
       <View collapsable={false} style={[styles.calloutTail, { left: width / 2 - 7 }]} />
@@ -1923,8 +1949,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    height: 42,
-    borderRadius: 21,
+    height: CALLOUT_PILL_HEIGHT,
+    borderRadius: 16,
     backgroundColor: homeColors.white,
     borderWidth: 1.5,
     borderColor: homeColors.coral,
@@ -1934,19 +1960,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 8,
   },
+  // 아이콘 박스 — pill 세로 중앙((62-24)/2=19).
   calloutIconBox: {
     position: 'absolute',
     left: 10,
-    top: 9,
+    top: 19,
     width: 24,
     height: 24,
     borderRadius: 8,
     backgroundColor: homeColors.coral,
   },
-  // 흰 집(아이콘박스 중심 x22 기준) — 지붕(14×6) 위, 몸통(10×8) 아래.
+  // 흰 집(아이콘박스 중심 기준) — 지붕(14×6) 위, 몸통(10×8) 아래.
   calloutHomeRoof: {
     position: 'absolute',
-    top: 14,
+    top: 24,
     left: 15,
     width: 0,
     height: 0,
@@ -1957,20 +1984,43 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     borderBottomColor: homeColors.white,
   },
-  calloutHomeBody: { position: 'absolute', top: 20, left: 17, width: 10, height: 8, backgroundColor: homeColors.white },
-  calloutLabel: { position: 'absolute', left: CALLOUT_TEXT_LEFT, top: 7, fontSize: 10, fontWeight: '700', letterSpacing: -0.2 },
+  calloutHomeBody: { position: 'absolute', top: 30, left: 17, width: 10, height: 8, backgroundColor: homeColors.white },
+  // 좌측정렬 3줄: 이름(12/700) · 거래유형(10/700) · 가격(14/800). fontFamily 직접 지정(스냅샷 안전).
+  calloutName: {
+    position: 'absolute',
+    left: CALLOUT_TEXT_LEFT,
+    top: 9,
+    fontFamily: PRETENDARD_BOLD,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '700',
+    color: homeColors.ink,
+    letterSpacing: -0.3,
+  },
+  calloutLabel: {
+    position: 'absolute',
+    left: CALLOUT_TEXT_LEFT,
+    top: 27,
+    fontFamily: PRETENDARD_BOLD,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
   calloutPriceText: {
     position: 'absolute',
     left: CALLOUT_TEXT_LEFT,
-    top: 19,
+    top: 39,
+    fontFamily: PRETENDARD_EXTRABOLD,
     fontSize: 14,
+    lineHeight: 17,
     fontWeight: '800',
     color: homeColors.ink,
     letterSpacing: -0.3,
   },
   calloutTail: {
     position: 'absolute',
-    top: 41,
+    top: CALLOUT_PILL_HEIGHT - 1,
     width: 0,
     height: 0,
     borderLeftWidth: 7,
