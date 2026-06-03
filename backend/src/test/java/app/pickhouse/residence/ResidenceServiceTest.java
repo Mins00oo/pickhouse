@@ -1,6 +1,7 @@
 package app.pickhouse.residence;
 
 import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.common.JsonMapConverter;
 import app.pickhouse.common.error.ApiException;
 import app.pickhouse.common.error.ErrorCode;
 import app.pickhouse.domain.house.DealType;
@@ -38,9 +39,11 @@ class ResidenceServiceTest {
     void setUp() {
         residences = mock(ResidenceRepository.class);
         photos = mock(PhotoRepository.class);
+        ObjectMapper om = new ObjectMapper();
         service = new ResidenceService(
             residences,
-            new JsonListConverter(new ObjectMapper()),
+            new JsonListConverter(om),
+            new JsonMapConverter(om),
             mock(PhotoLinker.class),
             photos
         );
@@ -139,6 +142,17 @@ class ResidenceServiceTest {
             null,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            // ── 위저드 신규 필드: nickname, visitedAt, contractedAt, roomType,
+            //    floorType, direction, maintenanceIncludes, utilityEstimates, fullOption ──
             null,
             null,
             null,

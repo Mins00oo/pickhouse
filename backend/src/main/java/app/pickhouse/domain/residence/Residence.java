@@ -2,6 +2,9 @@ package app.pickhouse.domain.residence;
 
 import app.pickhouse.domain.common.Address;
 import app.pickhouse.domain.house.DealType;
+import app.pickhouse.domain.house.Direction;
+import app.pickhouse.domain.house.FloorType;
+import app.pickhouse.domain.house.RoomType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -71,6 +74,27 @@ public class Residence {
     @JdbcTypeCode(SqlTypes.TINYINT) @Column(name = "first_impression") private Integer firstImpression;
 
     @Column(columnDefinition = "TEXT") private String memo;
+
+    // ── 집 추가 위저드 신규 필드 (House와 동일) ──
+    @Column(length = 100) private String nickname;
+    @Column(name = "visited_at") private Instant visitedAt;
+    @Column(name = "contracted_at") private Instant contractedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type")
+    private RoomType roomType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "floor_type")
+    private FloorType floorType;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private Direction direction;
+
+    @Column(name = "maintenance_includes_json", columnDefinition = "json") private String maintenanceIncludesJson;
+    @Column(name = "utility_estimates_json", columnDefinition = "json") private String utilityEstimatesJson;
+    @Column(name = "full_option") private Boolean fullOption;
 
     @Column(name = "contract_start_date", nullable = false) private LocalDate contractStartDate;
     @Column(name = "contract_end_date", nullable = false) private LocalDate contractEndDate;

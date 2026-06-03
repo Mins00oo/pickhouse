@@ -3,9 +3,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
 import { useSavePlace, useRemovePlace } from '../anchorPlaces.queries';
 import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { syncQueue } from '@/sync/syncQueue';
 import { useAuthStore } from '@/stores/authStore';
 
 jest.mock('@/db/anchorPlaces.repo');
+jest.mock('@/api/anchorPlaces.api');
+jest.mock('@/sync/syncQueue');
 
 let queryClient: QueryClient | null = null;
 const wrapper = ({ children }: { children: ReactNode }) => {
@@ -43,6 +46,7 @@ describe('useSavePlace', () => {
     });
     expect(anchorPlacesRepo.upsert).toHaveBeenCalledTimes(1);
     expect(anchorPlacesRepo.clearPrimaryExcept).toHaveBeenCalledWith('u1', 'WORKPLACE', saved.id);
+    expect(syncQueue.queueAnchorPlaceCreate).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT clear siblings when not primary', async () => {
@@ -59,9 +63,10 @@ describe('useSavePlace', () => {
 });
 
 describe('useRemovePlace', () => {
-  it('removes a place by id', async () => {
+  it('soft-deletes a place by id and enqueues a sync delete', async () => {
     const { result } = renderHook(() => useRemovePlace(), { wrapper });
     await result.current.mutateAsync('a1');
-    await waitFor(() => expect(anchorPlacesRepo.remove).toHaveBeenCalledWith('a1'));
+    await waitFor(() => expect(anchorPlacesRepo.softDelete).toHaveBeenCalledWith('a1'));
+    expect(syncQueue.queueAnchorPlaceDelete).toHaveBeenCalledWith('a1');
   });
 });

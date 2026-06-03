@@ -1,9 +1,11 @@
 package app.pickhouse.residence;
 
 import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.common.JsonMapConverter;
 import app.pickhouse.common.error.ApiException;
 import app.pickhouse.common.error.ErrorCode;
 import app.pickhouse.domain.photo.Photo;
+import app.pickhouse.house.dto.MaintenanceCodes;
 import app.pickhouse.domain.photo.PhotoRepository;
 import app.pickhouse.domain.residence.Residence;
 import app.pickhouse.domain.residence.ResidenceRepository;
@@ -27,19 +29,20 @@ public class ResidenceService {
 
     private final ResidenceRepository residences;
     private final JsonListConverter conv;
+    private final JsonMapConverter mapConv;
     private final PhotoLinker photoLinker;
     private final PhotoRepository photos;
 
     @Transactional(readOnly = true)
     public List<ResidenceDto> list(UUID userId) {
         return residences.findByUserIdAndDeletedAtIsNullOrderByContractStartDateDesc(userId)
-            .stream().map(r -> ResidenceDto.from(r, conv, residencePhotoIds(r.getId()))).toList();
+            .stream().map(r -> ResidenceDto.from(r, conv, mapConv, residencePhotoIds(r.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public ResidenceDto get(UUID userId, UUID id) {
         Residence r = findOwned(userId, id);
-        return ResidenceDto.from(r, conv, residencePhotoIds(r.getId()));
+        return ResidenceDto.from(r, conv, mapConv, residencePhotoIds(r.getId()));
     }
 
     @Transactional
@@ -70,6 +73,11 @@ public class ResidenceService {
             .ventilation(req.ventilation()).moisture(req.moisture())
             .neighborhood(req.neighborhood()).firstImpression(req.firstImpression())
             .memo(req.memo()).landlordMemo(req.landlordMemo())
+            .nickname(req.nickname()).visitedAt(req.visitedAt()).contractedAt(req.contractedAt())
+            .roomType(req.roomType()).floorType(req.floorType()).direction(req.direction())
+            .maintenanceIncludesJson(conv.toJson(MaintenanceCodes.toStrings(req.maintenanceIncludes())))
+            .utilityEstimatesJson(mapConv.toJson(req.utilityEstimates()))
+            .fullOption(req.fullOption())
             .contractStartDate(req.contractStartDate())
             .contractEndDate(req.contractEndDate())
             .contractPhotoId(req.contractPhotoId())
@@ -82,7 +90,7 @@ public class ResidenceService {
             .build();
         residences.save(r);
         linkPhotos(userId, r.getId(), req.moveInPhotoIds(), req.contractPhotoId());
-        return ResidenceDto.from(r, conv, List.of());
+        return ResidenceDto.from(r, conv, mapConv, List.of());
     }
 
     private static List<String> uuidStrings(List<UUID> ids) {
@@ -138,6 +146,17 @@ public class ResidenceService {
             .firstImpression(req.firstImpression() != null ? req.firstImpression() : r.getFirstImpression())
             .memo(req.memo() != null ? req.memo() : r.getMemo())
             .landlordMemo(req.landlordMemo() != null ? req.landlordMemo() : r.getLandlordMemo())
+            .nickname(req.nickname() != null ? req.nickname() : r.getNickname())
+            .visitedAt(req.visitedAt() != null ? req.visitedAt() : r.getVisitedAt())
+            .contractedAt(req.contractedAt() != null ? req.contractedAt() : r.getContractedAt())
+            .roomType(req.roomType() != null ? req.roomType() : r.getRoomType())
+            .floorType(req.floorType() != null ? req.floorType() : r.getFloorType())
+            .direction(req.direction() != null ? req.direction() : r.getDirection())
+            .maintenanceIncludesJson(req.maintenanceIncludes() != null
+                ? conv.toJson(MaintenanceCodes.toStrings(req.maintenanceIncludes())) : r.getMaintenanceIncludesJson())
+            .utilityEstimatesJson(req.utilityEstimates() != null
+                ? mapConv.toJson(req.utilityEstimates()) : r.getUtilityEstimatesJson())
+            .fullOption(req.fullOption() != null ? req.fullOption() : r.getFullOption())
             .contractStartDate(req.contractStartDate() != null ? req.contractStartDate() : r.getContractStartDate())
             .contractEndDate(req.contractEndDate() != null ? req.contractEndDate() : r.getContractEndDate())
             .contractPhotoId(req.contractPhotoId() != null ? req.contractPhotoId() : r.getContractPhotoId())
@@ -148,7 +167,7 @@ public class ResidenceService {
             .updatedAt(now)
             .build();
         residences.save(updated);
-        return ResidenceDto.from(updated, conv, residencePhotoIds(updated.getId()));
+        return ResidenceDto.from(updated, conv, mapConv, residencePhotoIds(updated.getId()));
     }
 
     @Transactional

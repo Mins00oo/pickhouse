@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { Address, AnchorPlace, AnchorType, TransportMode } from '@/types';
 import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { anchorPlacesApi } from '@/api/anchorPlaces.api';
+import { syncQueue } from '@/sync/syncQueue';
 import { attachCoords } from '@/integrations/kakaoGeocode';
 import { useAuthStore } from '@/stores/authStore';
+import { lastWriteWins } from '@/sync/conflictResolution';
 
 const ANCHORS_KEY = ['anchorPlaces'] as const;
 
@@ -12,8 +15,26 @@ export function useAnchorPlaces() {
   return useQuery({
     queryKey: ANCHORS_KEY,
     enabled: Boolean(userId),
-    queryFn: async () => (userId ? anchorPlacesRepo.listActive(userId) : []),
+    queryFn: async () => {
+      const local = userId ? await anchorPlacesRepo.listActive(userId) : [];
+      try {
+        const remote = await anchorPlacesApi.list();
+        return mergeAnchors(local, remote);
+      } catch {
+        return local;
+      }
+    },
   });
+}
+
+function mergeAnchors(local: AnchorPlace[], remote: AnchorPlace[]): AnchorPlace[] {
+  const byId = new Map<string, AnchorPlace>();
+  for (const p of remote) byId.set(p.id, p);
+  for (const p of local) {
+    const r = byId.get(p.id);
+    byId.set(p.id, lastWriteWins(p, r ?? null));
+  }
+  return Array.from(byId.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 export interface SavePlaceInput {
@@ -38,6 +59,7 @@ export function useSavePlace() {
           ? input.address
           : await attachCoords(input.address);
       const now = new Date().toISOString();
+      const isUpdate = Boolean(input.id);
       const id = input.id ?? Crypto.randomUUID();
       const place: AnchorPlace = {
         id,
@@ -53,6 +75,11 @@ export function useSavePlace() {
       if (place.isPrimary) {
         await anchorPlacesRepo.clearPrimaryExcept(userId, place.anchorType, id);
       }
+      if (isUpdate) {
+        await syncQueue.queueAnchorPlaceUpdate(id, place);
+      } else {
+        await syncQueue.queueAnchorPlaceCreate(place);
+      }
       return place;
     },
     onSuccess: () => {
@@ -64,7 +91,10 @@ export function useSavePlace() {
 export function useRemovePlace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => anchorPlacesRepo.remove(id),
+    mutationFn: async (id: string) => {
+      await anchorPlacesRepo.softDelete(id);
+      await syncQueue.queueAnchorPlaceDelete(id);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ANCHORS_KEY });
     },

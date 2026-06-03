@@ -68,6 +68,27 @@ public class House {
 
     @Column(columnDefinition = "TEXT") private String memo;
 
+    // ── 집 추가 위저드 신규 필드 ──
+    @Column(length = 100) private String nickname;
+    @Column(name = "visited_at") private Instant visitedAt;
+    @Column(name = "contracted_at") private Instant contractedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type")
+    private RoomType roomType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "floor_type")
+    private FloorType floorType;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private Direction direction;
+
+    @Column(name = "maintenance_includes_json", columnDefinition = "json") private String maintenanceIncludesJson;
+    @Column(name = "utility_estimates_json", columnDefinition = "json") private String utilityEstimatesJson;
+    @Column(name = "full_option") private Boolean fullOption;
+
     @Column(name = "promoted_at") private Instant promotedAt;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;

@@ -1,11 +1,16 @@
 package app.pickhouse.house;
 
 import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.common.JsonMapConverter;
 import app.pickhouse.common.error.ApiException;
 import app.pickhouse.common.error.ErrorCode;
 import app.pickhouse.domain.house.DealType;
+import app.pickhouse.domain.house.Direction;
+import app.pickhouse.domain.house.FloorType;
 import app.pickhouse.domain.house.House;
 import app.pickhouse.domain.house.HouseRepository;
+import app.pickhouse.domain.house.MaintenanceUtility;
+import app.pickhouse.domain.house.RoomType;
 import app.pickhouse.domain.photo.Photo;
 import app.pickhouse.domain.photo.PhotoRepository;
 import app.pickhouse.domain.residence.ResidenceRepository;
@@ -15,9 +20,11 @@ import app.pickhouse.photo.PhotoLinker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,7 +49,11 @@ class HouseServiceTest {
         residences = mock(ResidenceRepository.class);
         photos = mock(PhotoRepository.class);
         photoLinker = mock(PhotoLinker.class);
-        service = new HouseService(houses, residences, new JsonListConverter(new ObjectMapper()), photoLinker, photos);
+        ObjectMapper om = new ObjectMapper();
+        service = new HouseService(
+            houses, residences,
+            new JsonListConverter(om), new JsonMapConverter(om),
+            photoLinker, photos);
     }
 
     @Test
@@ -66,6 +77,54 @@ class HouseServiceTest {
             .isInstanceOf(ApiException.class)
             .extracting(e -> ((ApiException) e).getCode())
             .isEqualTo(ErrorCode.CONFLICT);
+    }
+
+    @Test
+    void create_round_trips_wizard_fields() {
+        UUID userId = UUID.randomUUID();
+        UUID houseId = UUID.randomUUID();
+        Instant visited = Instant.parse("2026-05-01T09:00:00Z");
+        CreateHouseRequest req = new CreateHouseRequest(
+            null, DealType.WOLSE, 1000, 60,
+            null, null, null, null, null, null, null,
+            null, null, null, null, null,
+            null, null, null,
+            3, null, null, null, null, null, null, null,
+            null,
+            "우리집", visited, null,
+            RoomType.TWO_ROOM, FloorType.GROUND, Direction.SOUTH,
+            List.of(MaintenanceUtility.WATER, MaintenanceUtility.GAS),
+            Map.of("WATER", 2, "ELECTRIC", 3),
+            true,
+            List.of(), houseId
+        );
+
+        HouseDto dto = service.create(userId, req);
+
+        // DTO 직접 라운드트립
+        assertThat(dto.nickname()).isEqualTo("우리집");
+        assertThat(dto.direction()).isEqualTo(Direction.SOUTH);
+        assertThat(dto.roomType()).isEqualTo(RoomType.TWO_ROOM);
+        assertThat(dto.floorType()).isEqualTo(FloorType.GROUND);
+        assertThat(dto.maintenanceIncludes())
+            .containsExactly(MaintenanceUtility.WATER, MaintenanceUtility.GAS);
+        assertThat(dto.utilityEstimates()).containsEntry("WATER", 2).containsEntry("ELECTRIC", 3);
+        assertThat(dto.fullOption()).isTrue();
+        assertThat(dto.visitedAt()).isEqualTo(visited);
+        assertThat(dto.waterPressure()).isEqualTo(3);
+
+        // 엔티티에 JSON 으로 저장됐는지 확인 → get() 재조회 라운드트립
+        ArgumentCaptor<House> captor = ArgumentCaptor.forClass(House.class);
+        verify(houses).save(captor.capture());
+        House saved = captor.getValue();
+        when(houses.findByIdAndUserIdAndDeletedAtIsNull(houseId, userId)).thenReturn(Optional.of(saved));
+        when(photos.findByHouseIdAndDeletedAtIsNullOrderByCreatedAtAsc(houseId)).thenReturn(List.of());
+
+        HouseDto fetched = service.get(userId, houseId);
+        assertThat(fetched.maintenanceIncludes())
+            .containsExactly(MaintenanceUtility.WATER, MaintenanceUtility.GAS);
+        assertThat(fetched.utilityEstimates()).containsEntry("WATER", 2);
+        assertThat(fetched.direction()).isEqualTo(Direction.SOUTH);
     }
 
     @Test
@@ -116,6 +175,16 @@ class HouseServiceTest {
             null,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            // ── 위저드 신규 필드 (nickname..fullOption) ──
             null,
             null,
             null,

@@ -2,11 +2,15 @@ import { syncProcessor } from '../syncProcessor';
 import { syncQueueRepo } from '@/db/syncQueue.repo';
 import { housesApi } from '@/api/houses.api';
 import { housesRepo } from '@/db/houses.repo';
+import { anchorPlacesApi } from '@/api/anchorPlaces.api';
+import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
 import { networkMonitor } from '../networkMonitor';
 
 jest.mock('@/db/syncQueue.repo');
 jest.mock('@/api/houses.api');
 jest.mock('@/db/houses.repo');
+jest.mock('@/api/anchorPlaces.api');
+jest.mock('@/db/anchorPlaces.repo');
 jest.mock('../networkMonitor');
 
 beforeEach(() => {
@@ -74,6 +78,33 @@ describe('syncProcessor', () => {
     await syncProcessor.processOnce();
     expect(housesApi.remove).toHaveBeenCalledWith('h3');
     expect(syncQueueRepo.remove).toHaveBeenCalledWith(11);
+  });
+
+  it('processes a create-anchorPlace op then markClean and removes from queue', async () => {
+    (networkMonitor.isOnline as jest.Mock).mockResolvedValueOnce(true);
+    (syncQueueRepo.list as jest.Mock).mockResolvedValueOnce([
+      { id: 21, opType: 'create', entity: 'anchorPlace', entityId: 'a1', payload: { id: 'a1' } },
+    ]);
+    (anchorPlacesApi.create as jest.Mock).mockResolvedValueOnce({ id: 'a1' });
+
+    await syncProcessor.processOnce();
+
+    expect(anchorPlacesApi.create).toHaveBeenCalledWith({ id: 'a1' });
+    expect(anchorPlacesRepo.markClean).toHaveBeenCalledWith('a1');
+    expect(syncQueueRepo.remove).toHaveBeenCalledWith(21);
+  });
+
+  it('processes a delete-anchorPlace op', async () => {
+    (networkMonitor.isOnline as jest.Mock).mockResolvedValueOnce(true);
+    (syncQueueRepo.list as jest.Mock).mockResolvedValueOnce([
+      { id: 22, opType: 'delete', entity: 'anchorPlace', entityId: 'a2', payload: {} },
+    ]);
+    (anchorPlacesApi.remove as jest.Mock).mockResolvedValueOnce(undefined);
+
+    await syncProcessor.processOnce();
+
+    expect(anchorPlacesApi.remove).toHaveBeenCalledWith('a2');
+    expect(syncQueueRepo.remove).toHaveBeenCalledWith(22);
   });
 
   it('on failure, increments attempts and keeps op in queue', async () => {
