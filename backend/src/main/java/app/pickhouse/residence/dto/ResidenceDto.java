@@ -1,15 +1,22 @@
 package app.pickhouse.residence.dto;
 
 import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.common.JsonMapConverter;
 import app.pickhouse.domain.house.DealType;
+import app.pickhouse.domain.house.Direction;
+import app.pickhouse.domain.house.FloorType;
+import app.pickhouse.domain.house.MaintenanceUtility;
+import app.pickhouse.domain.house.RoomType;
 import app.pickhouse.domain.residence.Residence;
 import app.pickhouse.house.dto.AddressDto;
+import app.pickhouse.house.dto.MaintenanceCodes;
 import app.pickhouse.house.dto.MeterReadingsDto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public record ResidenceDto(
@@ -45,6 +52,15 @@ public record ResidenceDto(
     Integer neighborhood,
     Integer firstImpression,
     String memo,
+    String nickname,
+    Instant visitedAt,
+    Instant contractedAt,
+    RoomType roomType,
+    FloorType floorType,
+    Direction direction,
+    List<MaintenanceUtility> maintenanceIncludes,
+    Map<String, Integer> utilityEstimates,
+    Boolean fullOption,
     List<UUID> photoIds,
     LocalDate contractStartDate,
     LocalDate contractEndDate,
@@ -55,11 +71,11 @@ public record ResidenceDto(
     Instant createdAt,
     Instant updatedAt
 ) {
-    public static ResidenceDto from(Residence r, JsonListConverter conv) {
-        return from(r, conv, List.of());
+    public static ResidenceDto from(Residence r, JsonListConverter conv, JsonMapConverter mapConv) {
+        return from(r, conv, mapConv, List.of());
     }
 
-    public static ResidenceDto from(Residence r, JsonListConverter conv, List<UUID> photoIds) {
+    public static ResidenceDto from(Residence r, JsonListConverter conv, JsonMapConverter mapConv, List<UUID> photoIds) {
         return new ResidenceDto(
             r.getId(),
             r.getSourceHouseId(),
@@ -79,6 +95,11 @@ public record ResidenceDto(
             r.getWaterPressure(), r.getSunlight(), r.getNoise(), r.getInsulation(),
             r.getVentilation(), r.getMoisture(), r.getNeighborhood(), r.getFirstImpression(),
             r.getMemo(),
+            r.getNickname(), r.getVisitedAt(), r.getContractedAt(),
+            r.getRoomType(), r.getFloorType(), r.getDirection(),
+            MaintenanceCodes.toEnums(conv.fromJson(r.getMaintenanceIncludesJson())),
+            mapConv.fromJson(r.getUtilityEstimatesJson()),
+            r.getFullOption(),
             photoIds != null ? photoIds : List.of(),
             r.getContractStartDate(), r.getContractEndDate(),
             r.getLandlordMemo(),

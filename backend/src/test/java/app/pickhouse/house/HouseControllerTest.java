@@ -52,7 +52,10 @@ class HouseControllerTest {
             null, null, null, null, null,
             null, null, null,
             null, null, null, null, null, null, null, null,
-            null, List.of(), Instant.now(), Instant.now());
+            null,
+            // ── 위저드 신규 필드 (nickname..fullOption) ──
+            null, null, null, null, null, null, null, null, null,
+            List.of(), Instant.now(), Instant.now());
     }
 
     @Test
@@ -69,6 +72,67 @@ class HouseControllerTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(houseId.toString()))
             .andExpect(jsonPath("$.dealType").value("JEONSE"));
+    }
+
+    @Test
+    void create_with_wizard_fields_round_trips_through_dto() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID houseId = UUID.randomUUID();
+        HouseDto dto = new HouseDto(houseId, null, DealType.WOLSE, 1000, 60,
+            null, null, null, null, null, null, null,
+            null, null, null, null, null,
+            null, null, null,
+            3, null, null, null, null, null, null, null,
+            null,
+            "우리집", null, null,
+            app.pickhouse.domain.house.RoomType.TWO_ROOM,
+            app.pickhouse.domain.house.FloorType.GROUND,
+            app.pickhouse.domain.house.Direction.SOUTH,
+            List.of(app.pickhouse.domain.house.MaintenanceUtility.WATER),
+            java.util.Map.of("WATER", 2),
+            true,
+            List.of(), Instant.now(), Instant.now());
+        when(service.create(eq(userId), any())).thenReturn(dto);
+
+        String body = """
+            {"dealType":"WOLSE","deposit":1000,"rent":60,"nickname":"우리집",
+             "roomType":"TWO_ROOM","floorType":"GROUND","direction":"SOUTH",
+             "maintenanceIncludes":["WATER"],"utilityEstimates":{"WATER":2},
+             "fullOption":true,"waterPressure":3}
+            """;
+        mvc.perform(post("/houses").with(authentication(auth(userId)))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.nickname").value("우리집"))
+            .andExpect(jsonPath("$.direction").value("SOUTH"))
+            .andExpect(jsonPath("$.roomType").value("TWO_ROOM"))
+            .andExpect(jsonPath("$.maintenanceIncludes[0]").value("WATER"))
+            .andExpect(jsonPath("$.utilityEstimates.WATER").value(2))
+            .andExpect(jsonPath("$.fullOption").value(true));
+    }
+
+    @Test
+    void create_rejects_condition_above_3() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String body = """
+            {"dealType":"WOLSE","deposit":1000,"rent":60,"waterPressure":4}
+            """;
+        mvc.perform(post("/houses").with(authentication(auth(userId)))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_accepts_condition_boundary_3() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID houseId = UUID.randomUUID();
+        when(service.create(eq(userId), any())).thenReturn(sampleDto(houseId));
+        String body = """
+            {"dealType":"WOLSE","deposit":1000,"rent":60,"waterPressure":3}
+            """;
+        mvc.perform(post("/houses").with(authentication(auth(userId)))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated());
     }
 
     @Test
