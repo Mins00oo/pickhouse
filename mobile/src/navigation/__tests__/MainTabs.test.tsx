@@ -82,7 +82,7 @@ describe('MainTabs', () => {
       fireEvent.press(getByTestId('tab-Compare'));
       jest.runOnlyPendingTimers();
     });
-    expect(await findByText('비교 기능 준비 중')).toBeTruthy();
+    expect(await findByText('비교할 집 고르기')).toBeTruthy();
 
     act(() => {
       fireEvent.press(getByTestId('tab-My'));
@@ -102,6 +102,6 @@ describe('MainTabs', () => {
 
     // HouseInput 위저드의 탭(기본/가격/구조/체크) 중 하나가 보이면 진입 성공.
     expect(await findByText('기본')).toBeTruthy();
-    expect(queryByText('비교 기능 준비 중')).toBeNull();
+    expect(queryByText('비교할 집 고르기')).toBeNull();
   });
 });

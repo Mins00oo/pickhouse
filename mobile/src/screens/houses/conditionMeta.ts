@@ -29,3 +29,25 @@ export function normalizeConditionLevel(v: number | undefined): 1 | 2 | 3 | unde
   if (r >= 3) return 3;
   return 2;
 }
+
+/**
+ * 항목별 컨디션 어휘 — 디자인의 CL_LABELS(pickhouse-shared.jsx) 미러.
+ * 1=나쁨 / 2=보통 / 3=좋음. 햇빛(sunlight)은 향(direction) 문자열을 직접 쓰므로 여기서 제외.
+ * (공용 좋음/보통/나쁨 대신 항목 맥락에 맞는 단어를 보여 비교 화면 가독성을 높인다.)
+ */
+const CONDITION_VALUE_WORDS: Record<
+  Exclude<ConditionKey, 'sunlight'>,
+  Record<1 | 2 | 3, string>
+> = {
+  waterPressure: { 1: '약함', 2: '보통', 3: '강함' },
+  moisture: { 1: '있음', 2: '약간', 3: '없음' },
+  noise: { 1: '나쁨', 2: '보통', 3: '좋음' },
+  ventilation: { 1: '안 됨', 2: '보통', 3: '잘 됨' },
+};
+
+/** 항목별 컨디션 단어. sunlight는 향 문자열을 직접 표시하므로 null. 값 없으면 '—'. */
+export function conditionValueLabel(key: ConditionKey, level: 1 | 2 | 3 | undefined): string {
+  if (key === 'sunlight') return '';
+  if (level == null) return '—';
+  return CONDITION_VALUE_WORDS[key][level];
+}
