@@ -2,6 +2,8 @@ package app.pickhouse.house;
 
 import app.pickhouse.domain.house.DealType;
 import app.pickhouse.house.dto.HouseDto;
+import app.pickhouse.photo.PhotoService;
+import app.pickhouse.photo.dto.PhotoDto;
 import app.pickhouse.security.JwtAuthFilter;
 import app.pickhouse.security.JwtVerifier;
 import app.pickhouse.security.SecurityConfig;
@@ -35,6 +37,7 @@ class HouseControllerTest {
 
     @Autowired MockMvc mvc;
     @MockBean HouseService service;
+    @MockBean PhotoService photoService;
 
     @TestConfiguration
     static class TestBeans {
@@ -144,6 +147,22 @@ class HouseControllerTest {
         mvc.perform(get("/houses/" + houseId).with(authentication(auth(userId))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(houseId.toString()));
+    }
+
+    @Test
+    void photos_returns_house_photos_for_owner() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID houseId = UUID.randomUUID();
+        UUID photoId = UUID.randomUUID();
+        PhotoDto photo = new PhotoDto(photoId, houseId, null,
+            "https://api/files/" + photoId + ".jpg", null, Instant.now());
+        when(photoService.listForHouse(userId, houseId)).thenReturn(List.of(photo));
+
+        mvc.perform(get("/houses/" + houseId + "/photos").with(authentication(auth(userId))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].id").value(photoId.toString()))
+            .andExpect(jsonPath("$[0].remoteUrl").value("https://api/files/" + photoId + ".jpg"));
     }
 
     @Test

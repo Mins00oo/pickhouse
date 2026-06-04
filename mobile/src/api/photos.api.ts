@@ -9,7 +9,7 @@ export interface PhotoUploadInput {
   takenAt?: string;
 }
 
-interface PhotoUploadResponse {
+export interface PhotoResponse {
   id: string;
   houseId?: string;
   residenceId?: string;
@@ -19,7 +19,7 @@ interface PhotoUploadResponse {
 }
 
 export const photosApi = {
-  async upload(input: PhotoUploadInput): Promise<PhotoUploadResponse> {
+  async upload(input: PhotoUploadInput): Promise<PhotoResponse> {
     const filename = input.localUri.split('/').pop() ?? 'photo.jpg';
     const form = new FormData();
     form.append('file', {
@@ -32,9 +32,14 @@ export const photosApi = {
     if (input.residenceId) form.append('residenceId', input.residenceId);
     if (input.takenAt) form.append('takenAt', input.takenAt);
 
-    const res = await getApiClient().post<PhotoUploadResponse>('/photos/upload', form, {
+    const res = await getApiClient().post<PhotoResponse>('/photos/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return res.data;
+  },
+
+  async listForHouse(houseId: string): Promise<PhotoResponse[]> {
+    const res = await getApiClient().get<PhotoResponse[]>(`/houses/${houseId}/photos`);
     return res.data;
   },
 };

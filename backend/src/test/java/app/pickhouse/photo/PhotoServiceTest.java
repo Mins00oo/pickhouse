@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -118,6 +119,40 @@ class PhotoServiceTest {
             .isInstanceOf(ApiException.class)
             .extracting(e -> ((ApiException) e).getCode())
             .isEqualTo(ErrorCode.BAD_REQUEST);
+    }
+
+    @Test
+    void listForHouse_returns_photos_for_owner() {
+        UUID userId = UUID.randomUUID();
+        UUID houseId = UUID.randomUUID();
+        UUID photoId = UUID.randomUUID();
+        when(houses.findByIdAndUserIdAndDeletedAtIsNull(houseId, userId))
+            .thenReturn(Optional.of(House.builder().id(houseId).userId(userId)
+                .dealType(DealType.JEONSE).deposit(1).rent(0)
+                .createdAt(Instant.now()).updatedAt(Instant.now()).build()));
+        when(photos.findByHouseIdAndDeletedAtIsNullOrderByCreatedAtAsc(houseId))
+            .thenReturn(List.of(Photo.builder().id(photoId).userId(userId).houseId(houseId)
+                .objectKey(photoId + ".jpg").remoteUrl("https://api/files/" + photoId + ".jpg")
+                .contentType("image/jpeg").createdAt(Instant.now()).build()));
+
+        List<PhotoDto> result = service.listForHouse(userId, houseId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo(photoId);
+        assertThat(result.get(0).remoteUrl()).isEqualTo("https://api/files/" + photoId + ".jpg");
+    }
+
+    @Test
+    void listForHouse_not_owned_throws_NOT_FOUND() {
+        UUID userId = UUID.randomUUID();
+        UUID houseId = UUID.randomUUID();
+        when(houses.findByIdAndUserIdAndDeletedAtIsNull(houseId, userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.listForHouse(userId, houseId))
+            .isInstanceOf(ApiException.class)
+            .extracting(e -> ((ApiException) e).getCode())
+            .isEqualTo(ErrorCode.NOT_FOUND);
+        verify(photos, never()).findByHouseIdAndDeletedAtIsNullOrderByCreatedAtAsc(any());
     }
 
     @Test

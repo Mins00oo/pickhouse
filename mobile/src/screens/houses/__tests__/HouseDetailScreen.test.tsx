@@ -3,14 +3,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HouseDetailScreen } from '../HouseDetailScreen';
 import { housesApi } from '@/api/houses.api';
+import { photosApi } from '@/api/photos.api';
 import { useAnchorDistances } from '@/queries/anchorDistances.queries';
 
 jest.mock('@/api/houses.api');
-jest.mock('@/db/photos.repo');
+jest.mock('@/api/photos.api');
 jest.mock('@/queries/anchorDistances.queries');
 
 beforeEach(() => {
   (useAnchorDistances as jest.Mock).mockReturnValue({ distances: [], isLoading: false });
+  (photosApi.listForHouse as jest.Mock).mockResolvedValue([]);
 });
 
 let queryClient: QueryClient | null = null;

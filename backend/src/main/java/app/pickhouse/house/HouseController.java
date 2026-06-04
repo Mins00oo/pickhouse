@@ -4,6 +4,8 @@ import app.pickhouse.house.dto.CreateHouseRequest;
 import app.pickhouse.house.dto.HouseDto;
 import app.pickhouse.house.dto.PromoteToResidenceRequest;
 import app.pickhouse.house.dto.UpdateHouseRequest;
+import app.pickhouse.photo.PhotoService;
+import app.pickhouse.photo.dto.PhotoDto;
 import app.pickhouse.residence.dto.ResidenceDto;
 import app.pickhouse.security.CurrentUserId;
 import jakarta.validation.Valid;
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class HouseController {
 
     private final HouseService service;
+    private final PhotoService photoService;
 
     @GetMapping
     public List<HouseDto> list(@CurrentUserId UUID userId) {
@@ -36,6 +39,11 @@ public class HouseController {
     @GetMapping("/{id}")
     public HouseDto get(@CurrentUserId UUID userId, @PathVariable UUID id) {
         return service.get(userId, id);
+    }
+
+    @GetMapping("/{id}/photos")
+    public List<PhotoDto> photos(@CurrentUserId UUID userId, @PathVariable UUID id) {
+        return photoService.listForHouse(userId, id);
     }
 
     @PatchMapping("/{id}")

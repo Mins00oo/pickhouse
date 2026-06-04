@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -25,6 +26,24 @@ public class PhotoService {
     private final PhotoRepository photos;
     private final HouseRepository houses;
     private final ResidenceRepository residences;
+
+    /** 집에 연결된 사진을 조회한다(소유자 검증 포함). 앱에서 사진을 다시 읽어들일 때 사용. */
+    @Transactional(readOnly = true)
+    public List<PhotoDto> listForHouse(UUID userId, UUID houseId) {
+        houses.findByIdAndUserIdAndDeletedAtIsNull(houseId, userId)
+            .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "house not found"));
+        return photos.findByHouseIdAndDeletedAtIsNullOrderByCreatedAtAsc(houseId)
+            .stream().map(PhotoDto::from).toList();
+    }
+
+    /** 거주지에 연결된 사진을 조회한다(소유자 검증 포함). */
+    @Transactional(readOnly = true)
+    public List<PhotoDto> listForResidence(UUID userId, UUID residenceId) {
+        residences.findByIdAndUserIdAndDeletedAtIsNull(residenceId, userId)
+            .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "residence not found"));
+        return photos.findByResidenceIdAndDeletedAtIsNullOrderByCreatedAtAsc(residenceId)
+            .stream().map(PhotoDto::from).toList();
+    }
 
     @Transactional
     public PhotoDto upload(UUID userId, MultipartFile file, UUID houseId, UUID residenceId, Instant takenAt) {
