@@ -39,6 +39,7 @@ export function PhotoGrid({ photos, onAdd, onRemove }: PhotoGridProps) {
       ))}
       {onAdd ? (
         <Pressable
+          testID="photo-add-button"
           onPress={onAdd}
           style={{
             width: 96,

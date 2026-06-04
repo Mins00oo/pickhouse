@@ -5,6 +5,8 @@ import { HouseInputScreen } from '../HouseInputScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { housesApi } from '@/api/houses.api';
 import { geocodeAddress } from '@/integrations/kakaoGeocode';
+import { cameraHelper } from '@/photos/cameraHelper';
+import { photosRepo } from '@/db/photos.repo';
 
 jest.mock('@/api/houses.api');
 jest.mock('@/db/photos.repo');
@@ -163,6 +165,45 @@ describe('HouseInputScreen (위저드)', () => {
     expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
   });
 
+  it('saves a new house without a client id and attaches local photos to the server id', async () => {
+    (cameraHelper.takePhoto as jest.Mock).mockResolvedValueOnce({
+      id: 'p-local',
+      localUri: 'file:///tmp/p-local.jpg',
+      mimeType: 'image/jpeg',
+    });
+    (housesApi.create as jest.Mock).mockResolvedValueOnce({
+      id: 'server-h1',
+      address: {},
+      dealType: 'WOLSE',
+      deposit: 1000,
+      rent: 50,
+      photoIds: [],
+      createdAt: '2026-06-04T00:00:00.000Z',
+      updatedAt: '2026-06-04T00:00:00.000Z',
+    });
+    const nav = navMock();
+    const { getByTestId, getAllByRole, getAllByPlaceholderText, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), 'test house');
+    await pickAddress(getByTestId, findByTestId);
+    const tabs = getAllByRole('tab');
+    fireEvent.press(tabs[1]);
+    const amountInputs = getAllByPlaceholderText('0');
+    fireEvent.changeText(amountInputs[0], '1000');
+    fireEvent.changeText(amountInputs[1], '50');
+    fireEvent.press(tabs[3]);
+    fireEvent.press(getByTestId('photo-add-button'));
+    await waitFor(() => expect(cameraHelper.takePhoto).toHaveBeenCalledWith(undefined));
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
+    const [body] = (housesApi.create as jest.Mock).mock.calls[0]!;
+    expect(body).not.toHaveProperty('id');
+    await waitFor(() => expect(photosRepo.attachToHouse).toHaveBeenCalledWith(['p-local'], 'server-h1'));
+    expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
+  });
+
   it('shows the detail address input immediately while geocoding is still pending', async () => {
     const pending = deferred<{ latitude: number; longitude: number } | null>();
     (geocodeAddress as jest.Mock).mockReturnValueOnce(pending.promise);
@@ -285,7 +326,7 @@ describe('HouseInputScreen (위저드)', () => {
 
     await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
     expect(housesApi.create).toHaveBeenCalledWith(
-      expect.objectContaining({ dealType: 'JEONSE', deposit: 18000, rent: undefined }),
+      expect.objectContaining({ dealType: 'JEONSE', deposit: 18000, rent: 0 }),
     );
   });
 

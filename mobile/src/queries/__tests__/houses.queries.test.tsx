@@ -49,28 +49,74 @@ describe('useHouses', () => {
 });
 
 describe('useCreateHouse', () => {
-  it('POSTs the house to the backend with a client-generated id (photoIds stripped)', async () => {
-    (housesApi.create as jest.Mock).mockImplementation((body) => Promise.resolve({ ...body, photoIds: [] }));
+  it('POSTs only create request fields and normalizes date-only visitedAt', async () => {
+    (housesApi.create as jest.Mock).mockImplementation((body) =>
+      Promise.resolve({
+        ...body,
+        id: 'server-h1',
+        photoIds: [],
+        createdAt: '2026-06-04T06:47:30.672Z',
+        updatedAt: '2026-06-04T06:47:30.672Z',
+      }),
+    );
     const { result } = renderHook(() => useCreateHouse(), { wrapper });
     await result.current.mutateAsync({
       address: { roadAddress: '', jibunAddress: '', zonecode: '' },
       dealType: 'WOLSE',
       deposit: 100,
+      rent: 50,
+      visitedAt: '2026-06-04',
     });
     expect(housesApi.create).toHaveBeenCalledTimes(1);
     const [body] = (housesApi.create as jest.Mock).mock.calls[0]!;
-    expect(body.id).toBeTruthy();
     expect(body.dealType).toBe('WOLSE');
+    expect(body.visitedAt).toBe('2026-06-04T00:00:00.000Z');
+    expect(body).not.toHaveProperty('id');
     expect(body).not.toHaveProperty('photoIds');
+    expect(body).not.toHaveProperty('createdAt');
+    expect(body).not.toHaveProperty('updatedAt');
+  });
+
+  it('sends rent 0 for jeonse create requests', async () => {
+    (housesApi.create as jest.Mock).mockImplementation((body) =>
+      Promise.resolve({
+        ...body,
+        id: 'server-h1',
+        photoIds: [],
+        createdAt: '',
+        updatedAt: '',
+      }),
+    );
+    const { result } = renderHook(() => useCreateHouse(), { wrapper });
+    await result.current.mutateAsync({
+      address: { roadAddress: '', jibunAddress: '', zonecode: '' },
+      dealType: 'JEONSE',
+      deposit: 10000,
+    });
+    const [body] = (housesApi.create as jest.Mock).mock.calls[0]!;
+    expect(body.rent).toBe(0);
   });
 });
 
 describe('useUpdateHouse', () => {
-  it('PATCHes the house by id (photoIds stripped)', async () => {
+  it('PATCHes request fields by id and strips response/local-only fields', async () => {
     (housesApi.update as jest.Mock).mockResolvedValue({ id: 'h1', memo: 'x', photoIds: [] });
     const { result } = renderHook(() => useUpdateHouse(), { wrapper });
-    await result.current.mutateAsync({ id: 'h1', patch: { memo: 'x', photoIds: ['p1'] } });
-    expect(housesApi.update).toHaveBeenCalledWith('h1', { memo: 'x' });
+    await result.current.mutateAsync({
+      id: 'h1',
+      patch: {
+        id: 'ignored',
+        memo: 'x',
+        photoIds: ['p1'],
+        createdAt: 'ignored',
+        updatedAt: 'ignored',
+        visitedAt: '2026-06-04',
+      } as any,
+    });
+    expect(housesApi.update).toHaveBeenCalledWith('h1', {
+      memo: 'x',
+      visitedAt: '2026-06-04T00:00:00.000Z',
+    });
   });
 });
 

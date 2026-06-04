@@ -60,6 +60,17 @@ export const photosRepo = {
     );
   },
 
+  async attachToHouse(photoIds: string[], houseId: string): Promise<void> {
+    if (photoIds.length === 0) return;
+    const db = await getDatabase();
+    const placeholders = photoIds.map(() => '?').join(',');
+    await db.runAsync(
+      `UPDATE photos SET house_id = ?, is_dirty = 1 WHERE id IN (${placeholders})`,
+      houseId,
+      ...photoIds,
+    );
+  },
+
   async markUploading(id: string): Promise<void> {
     const db = await getDatabase();
     await db.runAsync(

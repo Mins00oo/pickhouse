@@ -1,4 +1,4 @@
-import { House, Residence } from '@/types';
+import { CreateHouseRequest, House, Residence, UpdateHouseRequest } from '@/types';
 import { getApiClient } from './client';
 
 export const housesApi = {
@@ -12,12 +12,12 @@ export const housesApi = {
     return res.data;
   },
 
-  async create(body: House): Promise<House> {
+  async create(body: CreateHouseRequest): Promise<House> {
     const res = await getApiClient().post<House>('/houses', body);
     return res.data;
   },
 
-  async update(id: string, patch: Partial<House>): Promise<House> {
+  async update(id: string, patch: UpdateHouseRequest): Promise<House> {
     const res = await getApiClient().patch<House>(`/houses/${id}`, patch);
     return res.data;
   },
