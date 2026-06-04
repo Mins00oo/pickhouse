@@ -4,11 +4,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HouseListScreen } from '../HouseListScreen';
-import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
 import { useAuthStore } from '@/stores/authStore';
 
-jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 
 let queryClient: QueryClient | null = null;
@@ -68,8 +66,7 @@ const houses = [
 ] as any[];
 
 function mockHouses(nextHouses = houses) {
-  (housesRepo.listActive as jest.Mock).mockResolvedValue(nextHouses);
-  (housesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
+  (housesApi.list as jest.Mock).mockResolvedValue(nextHouses);
 }
 
 beforeEach(() => {

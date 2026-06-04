@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -8,7 +8,6 @@ import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
 import { House } from '@/types';
 import { colors } from '@/theme';
-import { getDisplayHouses } from '@/screens/houses/houseSampleData';
 import {
   formatHousePriceShort,
   getHouseTitle,
@@ -21,8 +20,7 @@ type Props = BottomTabScreenProps<MainTabParamList, 'Compare'>;
 /** 비교 진입 — 기록한 집 중 딱 2개를 골라 1:1 비교로 이동. */
 export function ComparePickerScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { data = [] } = useHouses();
-  const houses = useMemo(() => getDisplayHouses(data), [data]);
+  const { data: houses = [] } = useHouses();
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = useCallback((id: string) => {
@@ -95,16 +93,24 @@ export function ComparePickerScreen({ navigation }: Props) {
           내가 기록한 집 <Text style={{ color: colors.primary }}>{houses.length}</Text>
         </Text>
 
-        <View style={{ gap: 8 }}>
-          {houses.map((house) => (
-            <HouseRow
-              key={house.id}
-              house={house}
-              selected={selected.includes(house.id)}
-              onToggle={() => toggle(house.id)}
-            />
-          ))}
-        </View>
+        {houses.length < 2 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="git-compare-outline" size={28} color={colors.muted} />
+            <Text style={styles.emptyTitle}>비교할 집이 부족해요</Text>
+            <Text style={styles.emptyBody}>집을 2개 이상 기록하면 1:1로 비교할 수 있어요.</Text>
+          </View>
+        ) : (
+          <View style={{ gap: 8 }}>
+            {houses.map((house) => (
+              <HouseRow
+                key={house.id}
+                house={house}
+                selected={selected.includes(house.id)}
+                onToggle={() => toggle(house.id)}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
@@ -214,6 +220,9 @@ const styles = StyleSheet.create({
   slotName: { fontSize: 13.5, fontWeight: '700', color: colors.ink, letterSpacing: -0.3 },
   slotPrice: { marginTop: 1, fontSize: 14, fontWeight: '700', color: colors.ink },
   countLabel: { fontSize: 13, fontWeight: '700', color: colors.ink70, marginBottom: 10 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  emptyBody: { fontSize: 13, fontWeight: '500', color: colors.muted, textAlign: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

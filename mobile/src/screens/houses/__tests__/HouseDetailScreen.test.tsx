@@ -2,11 +2,9 @@ import { render } from '@testing-library/react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HouseDetailScreen } from '../HouseDetailScreen';
-import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
 import { useAnchorDistances } from '@/queries/anchorDistances.queries';
 
-jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 jest.mock('@/db/photos.repo');
 jest.mock('@/queries/anchorDistances.queries');
@@ -34,8 +32,7 @@ describe('HouseDetailScreen', () => {
       dealType: 'WOLSE', deposit: 1000, rent: 50, memo: '햇빛 잘 듦',
       photoIds: [], createdAt: '2026', updatedAt: '2026',
     };
-    (housesRepo.findById as jest.Mock).mockResolvedValue(house);
-    (housesApi.get as jest.Mock).mockRejectedValue(new Error('offline'));
+    (housesApi.get as jest.Mock).mockResolvedValue(house);
 
     const nav = { goBack: jest.fn(), navigate: jest.fn() } as any;
     const { findByText } = render(
@@ -70,8 +67,7 @@ describe('HouseDetailScreen', () => {
       createdAt: '2026',
       updatedAt: '2026',
     };
-    (housesRepo.findById as jest.Mock).mockResolvedValue(house);
-    (housesApi.get as jest.Mock).mockRejectedValue(new Error('offline'));
+    (housesApi.get as jest.Mock).mockResolvedValue(house);
 
     const nav = { goBack: jest.fn(), navigate: jest.fn() } as any;
     const { findByText, getByText } = render(
@@ -98,8 +94,7 @@ describe('HouseDetailScreen', () => {
       dealType: 'WOLSE', deposit: 1000, rent: 50,
       photoIds: [], createdAt: '2026', updatedAt: '2026',
     };
-    (housesRepo.findById as jest.Mock).mockResolvedValue(house);
-    (housesApi.get as jest.Mock).mockRejectedValue(new Error('offline'));
+    (housesApi.get as jest.Mock).mockResolvedValue(house);
     (useAnchorDistances as jest.Mock).mockReturnValue({
       distances: [{ anchorType: 'WORKPLACE', km: 3.2, source: 'driving', durationMin: 12 }],
       isLoading: false,
@@ -124,8 +119,7 @@ describe('HouseDetailScreen', () => {
       dealType: 'WOLSE', deposit: 1000, rent: 50,
       photoIds: [], createdAt: '2026', updatedAt: '2026',
     };
-    (housesRepo.findById as jest.Mock).mockResolvedValue(house);
-    (housesApi.get as jest.Mock).mockRejectedValue(new Error('offline'));
+    (housesApi.get as jest.Mock).mockResolvedValue(house);
 
     const nav = { goBack: jest.fn(), navigate: jest.fn() } as any;
     const { findByText, queryByTestId } = render(

@@ -1,65 +1,45 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { House, HouseDraft } from '@/types';
-import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
-import { syncQueue } from '@/sync/syncQueue';
 import { useAuthStore } from '@/stores/authStore';
-import { lastWriteWins } from '@/sync/conflictResolution';
 
 const HOUSES_KEY = ['houses'] as const;
+
+// 서버 사진은 별도 업로드(/photos)로 관리하므로 house create/update payload에서는 제외한다.
+function stripPhotoIds<T extends { photoIds?: unknown }>(payload: T): Omit<T, 'photoIds'> {
+  const rest = { ...payload };
+  delete (rest as { photoIds?: unknown }).photoIds;
+  return rest;
+}
 
 export function useHouses() {
   const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
     queryKey: HOUSES_KEY,
     enabled: Boolean(userId),
-    queryFn: async () => {
-      const local = userId ? await housesRepo.listActive(userId) : [];
-      try {
-        const remote = await housesApi.list();
-        return mergeHouses(local, remote);
-      } catch {
-        return local;
-      }
-    },
+    queryFn: () => housesApi.list(),
   });
-}
-
-function mergeHouses(local: House[], remote: House[]): House[] {
-  const byId = new Map<string, House>();
-  for (const h of remote) byId.set(h.id, h);
-  for (const h of local) {
-    const r = byId.get(h.id);
-    byId.set(h.id, lastWriteWins(h, r ?? null));
-  }
-  return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function useHouse(id: string | undefined) {
   return useQuery({
     queryKey: ['house', id],
     enabled: Boolean(id),
-    queryFn: async () => {
+    queryFn: () => {
       if (!id) throw new Error('missing id');
-      const local = await housesRepo.findById(id);
-      try {
-        const remote = await housesApi.get(id);
-        return lastWriteWins(local ?? remote, remote);
-      } catch {
-        if (!local) throw new Error('not found');
-        return local;
-      }
+      return housesApi.get(id);
     },
   });
 }
 
 export function useCreateHouse() {
   const qc = useQueryClient();
-  const userId = useAuthStore((s) => s.user?.id) ?? 'unknown';
   return useMutation({
     mutationFn: async (draft: HouseDraft) => {
       const now = new Date().toISOString();
+      // 클라이언트에서 UUID를 생성해 전송하면 백엔드가 그대로 저장한다(중복 시 CONFLICT).
+      // → 생성 직후 이 id로 조회/수정이 가능하다.
       const house: House = {
         id: draft.id ?? Crypto.randomUUID(),
         address: draft.address,
@@ -102,11 +82,10 @@ export function useCreateHouse() {
         createdAt: now,
         updatedAt: now,
       };
-      await housesRepo.insert(house, userId);
-      await syncQueue.queueHouseCreate(house);
-      return house;
+      return housesApi.create(stripPhotoIds(house) as House);
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
+      qc.setQueryData(['house', created.id], created);
       qc.invalidateQueries({ queryKey: HOUSES_KEY });
     },
   });
@@ -115,21 +94,12 @@ export function useCreateHouse() {
 export function useUpdateHouse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<House> }) => {
-      const existing = await housesRepo.findById(id);
-      if (!existing) throw new Error('house not found locally');
-      const updated: House = {
-        ...existing,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      await housesRepo.update(updated);
-      await syncQueue.queueHouseUpdate(id, patch);
-      return updated;
-    },
-    onSuccess: (h) => {
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<House> }) =>
+      housesApi.update(id, stripPhotoIds(patch)),
+    onSuccess: (updated) => {
+      qc.setQueryData(['house', updated.id], updated);
       qc.invalidateQueries({ queryKey: HOUSES_KEY });
-      qc.invalidateQueries({ queryKey: ['house', h.id] });
+      qc.invalidateQueries({ queryKey: ['house', updated.id] });
     },
   });
 }
@@ -137,10 +107,7 @@ export function useUpdateHouse() {
 export function useDeleteHouse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      await housesRepo.softDelete(id);
-      await syncQueue.queueHouseDelete(id);
-    },
+    mutationFn: (id: string) => housesApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: HOUSES_KEY }),
   });
 }

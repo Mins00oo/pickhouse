@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
 import { anchorPlacesApi } from '@/api/anchorPlaces.api';
-import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
 import { useAuthStore } from '@/stores/authStore';
 import type { AnchorPlace } from '@/types';
@@ -13,7 +12,6 @@ import { PlacesListScreen } from '../PlacesListScreen';
 
 jest.mock('@/db/anchorPlaces.repo');
 jest.mock('@/api/anchorPlaces.api');
-jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 
 const wrap = (content: ReactNode) => {
@@ -48,8 +46,7 @@ beforeEach(() => {
     refreshToken: 'r',
     status: 'authenticated',
   });
-  (housesRepo.listActive as jest.Mock).mockResolvedValue([]);
-  (housesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
+  (housesApi.list as jest.Mock).mockResolvedValue([]);
   (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
   (anchorPlacesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
 });

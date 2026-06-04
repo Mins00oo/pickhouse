@@ -3,12 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MainTabs } from '../MainTabs';
-import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
 import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
 import { useAuthStore } from '@/stores/authStore';
 
-jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
 jest.mock('@/db/anchorPlaces.repo');
 
@@ -47,8 +45,7 @@ beforeEach(() => {
     refreshToken: 'r',
     status: 'authenticated',
   });
-  (housesRepo.listActive as jest.Mock).mockResolvedValue([]);
-  (housesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
+  (housesApi.list as jest.Mock).mockResolvedValue([]);
   (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
 });
 

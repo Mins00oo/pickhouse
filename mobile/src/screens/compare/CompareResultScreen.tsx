@@ -8,7 +8,6 @@ import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
 import { useHouseCommute } from '@/queries/anchorDistances.queries';
 import { House } from '@/types';
 import { colors } from '@/theme';
-import { getDisplayHouses } from '@/screens/houses/houseSampleData';
 import { formatDepositShort, pickPrimaryAnchors } from '@/screens/houses/houseMapUtils';
 import { builtYearLabel, dealTypeLabel, FACILITY_META, roomTypeLabel } from '@/domain/house';
 import { CompareTopBar } from './components/CompareTopBar';
@@ -26,8 +25,7 @@ type Commute = { work?: number; school?: number };
 
 export function CompareResultScreen({ route, navigation }: Props) {
   const { aId, bId } = route.params;
-  const { data = [] } = useHouses();
-  const houses = useMemo(() => getDisplayHouses(data), [data]);
+  const { data: houses = [] } = useHouses();
   const a = houses.find((h) => h.id === aId);
   const b = houses.find((h) => h.id === bId);
 
