@@ -284,12 +284,17 @@ export function HouseInputScreen({ navigation, route }: Props) {
       return;
     }
     const draft = buildDraft();
-    if (typeof houseId === 'string') {
-      await updateHouse({ id: houseId, patch: draft });
-    } else {
-      await createHouse({ id: tempHouseId, ...draft });
+    try {
+      if (typeof houseId === 'string') {
+        await updateHouse({ id: houseId, patch: draft });
+      } else {
+        await createHouse({ id: tempHouseId, ...draft });
+      }
+      navigation.goBack();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      Alert.alert('저장에 실패했어요', `서버에 연결하지 못했어요.\n${message}`);
     }
-    navigation.goBack();
   }
 
   const includedCodes = form.maintenanceIncludes.map((i) => MAINTENANCE_OPTIONS[i]!.code);

@@ -22,6 +22,31 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
     headers: { 'Content-Type': 'application/json' },
   });
 
+  if (__DEV__) {
+    // 개발 중 네트워크 가시성: 요청/응답/에러를 Metro 콘솔에 출력한다.
+    // eslint-disable-next-line no-console
+    console.log('[api] baseURL =', opts.baseURL);
+    client.interceptors.request.use((config) => {
+      // eslint-disable-next-line no-console
+      console.log(`[api] → ${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url ?? ''}`);
+      return config;
+    });
+    client.interceptors.response.use(
+      (resp) => {
+        // eslint-disable-next-line no-console
+        console.log(`[api] ← ${resp.status} ${resp.config.url ?? ''}`);
+        return resp;
+      },
+      (err: AxiosError) => {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[api] ✗ ${err.config?.url ?? ''} — ${err.response?.status ?? err.code ?? 'NETWORK'}: ${err.message}`,
+        );
+        throw err;
+      },
+    );
+  }
+
   client.interceptors.request.use(async (config) => {
     const cfg = config as RetriableConfig;
     // Skip token injection on retry — token already set by response interceptor
