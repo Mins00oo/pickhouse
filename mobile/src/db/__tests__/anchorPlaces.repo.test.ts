@@ -60,11 +60,18 @@ describe('anchorPlacesRepo', () => {
     expect(args).toEqual(['u1', 'WORKPLACE', 'a1']);
   });
 
-  it('remove hard-deletes a single place by id', async () => {
-    await anchorPlacesRepo.remove('a1');
+  it('softDelete marks a single place is_deleted and is_dirty by id', async () => {
+    await anchorPlacesRepo.softDelete('a1');
     const [sql, ...args] = mockRunAsync.mock.calls[0]!;
-    expect(sql).toMatch(/DELETE FROM anchor_places WHERE id = \?/);
-    expect(args).toEqual(['a1']);
+    expect(sql).toMatch(/UPDATE anchor_places SET is_deleted = 1, is_dirty = 1/);
+    expect(args[args.length - 1]).toBe('a1');
+  });
+
+  it('listActive filters out soft-deleted rows', async () => {
+    mockGetAllAsync.mockResolvedValueOnce([]);
+    await anchorPlacesRepo.listActive('u1');
+    const [sql] = mockGetAllAsync.mock.calls[0]!;
+    expect(sql).toMatch(/is_deleted = 0/);
   });
 
   it('listActive scopes by user, orders by created_at, and maps transport/isPrimary (stripping user_id)', async () => {

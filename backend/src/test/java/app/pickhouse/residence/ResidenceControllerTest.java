@@ -53,7 +53,10 @@ class ResidenceControllerTest {
             null, null, null, null, null,
             null, null, null, null, null, null,
             null, null, null, null, null, null, null, null,
-            null, List.of(),
+            null,
+            // ── 위저드 신규 필드 (nickname..fullOption) ──
+            null, null, null, null, null, null, null, null, null,
+            List.of(),
             LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1),
             null, null, List.of(), null,
             Instant.now(), Instant.now()

@@ -1,11 +1,13 @@
 package app.pickhouse.house;
 
 import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.common.JsonMapConverter;
 import app.pickhouse.common.error.ApiException;
 import app.pickhouse.common.error.ErrorCode;
 import app.pickhouse.domain.common.Address;
 import app.pickhouse.domain.house.House;
 import app.pickhouse.domain.house.HouseRepository;
+import app.pickhouse.house.dto.MaintenanceCodes;
 import app.pickhouse.domain.photo.Photo;
 import app.pickhouse.domain.photo.PhotoRepository;
 import app.pickhouse.domain.residence.Residence;
@@ -33,19 +35,20 @@ public class HouseService {
     private final HouseRepository houses;
     private final ResidenceRepository residences;
     private final JsonListConverter conv;
+    private final JsonMapConverter mapConv;
     private final PhotoLinker photoLinker;
     private final PhotoRepository photos;
 
     @Transactional(readOnly = true)
     public List<HouseDto> list(UUID userId) {
         return houses.findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
-            .stream().map(h -> HouseDto.from(h, conv, housePhotoIds(h.getId()))).toList();
+            .stream().map(h -> HouseDto.from(h, conv, mapConv, housePhotoIds(h.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public HouseDto get(UUID userId, UUID id) {
         House h = findOwned(userId, id);
-        return HouseDto.from(h, conv, housePhotoIds(h.getId()));
+        return HouseDto.from(h, conv, mapConv, housePhotoIds(h.getId()));
     }
 
     @Transactional
@@ -72,13 +75,18 @@ public class HouseService {
             .ventilation(req.ventilation()).moisture(req.moisture())
             .neighborhood(req.neighborhood()).firstImpression(req.firstImpression())
             .memo(req.memo())
+            .nickname(req.nickname()).visitedAt(req.visitedAt()).contractedAt(req.contractedAt())
+            .roomType(req.roomType()).floorType(req.floorType()).direction(req.direction())
+            .maintenanceIncludesJson(conv.toJson(MaintenanceCodes.toStrings(req.maintenanceIncludes())))
+            .utilityEstimatesJson(mapConv.toJson(req.utilityEstimates()))
+            .fullOption(req.fullOption())
             .createdAt(now).updatedAt(now)
             .build();
         houses.save(h);
         if (req.photoIds() != null && !req.photoIds().isEmpty()) {
             photoLinker.linkToHouse(userId, req.photoIds(), h.getId());
         }
-        return HouseDto.from(h, conv, req.photoIds() != null ? req.photoIds() : List.of());
+        return HouseDto.from(h, conv, mapConv, req.photoIds() != null ? req.photoIds() : List.of());
     }
 
     @Transactional
@@ -115,10 +123,21 @@ public class HouseService {
             .neighborhood(req.neighborhood() != null ? req.neighborhood() : h.getNeighborhood())
             .firstImpression(req.firstImpression() != null ? req.firstImpression() : h.getFirstImpression())
             .memo(req.memo() != null ? req.memo() : h.getMemo())
+            .nickname(req.nickname() != null ? req.nickname() : h.getNickname())
+            .visitedAt(req.visitedAt() != null ? req.visitedAt() : h.getVisitedAt())
+            .contractedAt(req.contractedAt() != null ? req.contractedAt() : h.getContractedAt())
+            .roomType(req.roomType() != null ? req.roomType() : h.getRoomType())
+            .floorType(req.floorType() != null ? req.floorType() : h.getFloorType())
+            .direction(req.direction() != null ? req.direction() : h.getDirection())
+            .maintenanceIncludesJson(req.maintenanceIncludes() != null
+                ? conv.toJson(MaintenanceCodes.toStrings(req.maintenanceIncludes())) : h.getMaintenanceIncludesJson())
+            .utilityEstimatesJson(req.utilityEstimates() != null
+                ? mapConv.toJson(req.utilityEstimates()) : h.getUtilityEstimatesJson())
+            .fullOption(req.fullOption() != null ? req.fullOption() : h.getFullOption())
             .updatedAt(now)
             .build();
         houses.save(updated);
-        return HouseDto.from(updated, conv, housePhotoIds(updated.getId()));
+        return HouseDto.from(updated, conv, mapConv, housePhotoIds(updated.getId()));
     }
 
     @Transactional
@@ -153,6 +172,11 @@ public class HouseService {
             .ventilation(h.getVentilation()).moisture(h.getMoisture())
             .neighborhood(h.getNeighborhood()).firstImpression(h.getFirstImpression())
             .memo(h.getMemo())
+            .nickname(h.getNickname()).visitedAt(h.getVisitedAt()).contractedAt(h.getContractedAt())
+            .roomType(h.getRoomType()).floorType(h.getFloorType()).direction(h.getDirection())
+            .maintenanceIncludesJson(h.getMaintenanceIncludesJson())
+            .utilityEstimatesJson(h.getUtilityEstimatesJson())
+            .fullOption(h.getFullOption())
             .contractStartDate(req.contractStartDate())
             .contractEndDate(req.contractEndDate())
             .landlordMemo(req.landlordMemo())
@@ -168,7 +192,7 @@ public class HouseService {
         residences.save(r);
         linkResidencePhotos(userId, r.getId(), req.moveInPhotoIds(), req.contractPhotoId());
         h.markPromoted(now);
-        return ResidenceDto.from(r, conv);
+        return ResidenceDto.from(r, conv, mapConv);
     }
 
     private static List<String> uuidStrings(List<UUID> ids) {

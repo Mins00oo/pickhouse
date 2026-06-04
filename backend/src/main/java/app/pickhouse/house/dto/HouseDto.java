@@ -1,13 +1,19 @@
 package app.pickhouse.house.dto;
 
 import app.pickhouse.common.JsonListConverter;
+import app.pickhouse.common.JsonMapConverter;
 import app.pickhouse.domain.house.DealType;
+import app.pickhouse.domain.house.Direction;
+import app.pickhouse.domain.house.FloorType;
 import app.pickhouse.domain.house.House;
+import app.pickhouse.domain.house.MaintenanceUtility;
+import app.pickhouse.domain.house.RoomType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public record HouseDto(
@@ -40,15 +46,24 @@ public record HouseDto(
     Integer neighborhood,
     Integer firstImpression,
     String memo,
+    String nickname,
+    Instant visitedAt,
+    Instant contractedAt,
+    RoomType roomType,
+    FloorType floorType,
+    Direction direction,
+    List<MaintenanceUtility> maintenanceIncludes,
+    Map<String, Integer> utilityEstimates,
+    Boolean fullOption,
     List<UUID> photoIds,
     Instant createdAt,
     Instant updatedAt
 ) {
-    public static HouseDto from(House h, JsonListConverter conv) {
-        return from(h, conv, List.of());
+    public static HouseDto from(House h, JsonListConverter conv, JsonMapConverter mapConv) {
+        return from(h, conv, mapConv, List.of());
     }
 
-    public static HouseDto from(House h, JsonListConverter conv, List<UUID> photoIds) {
+    public static HouseDto from(House h, JsonListConverter conv, JsonMapConverter mapConv, List<UUID> photoIds) {
         return new HouseDto(
             h.getId(),
             AddressDto.from(h.getAddress()),
@@ -62,7 +77,13 @@ public record HouseDto(
             h.getGarbage(),
             h.getWaterPressure(), h.getSunlight(), h.getNoise(), h.getInsulation(),
             h.getVentilation(), h.getMoisture(), h.getNeighborhood(), h.getFirstImpression(),
-            h.getMemo(), photoIds != null ? photoIds : List.of(), h.getCreatedAt(), h.getUpdatedAt()
+            h.getMemo(),
+            h.getNickname(), h.getVisitedAt(), h.getContractedAt(),
+            h.getRoomType(), h.getFloorType(), h.getDirection(),
+            MaintenanceCodes.toEnums(conv.fromJson(h.getMaintenanceIncludesJson())),
+            mapConv.fromJson(h.getUtilityEstimatesJson()),
+            h.getFullOption(),
+            photoIds != null ? photoIds : List.of(), h.getCreatedAt(), h.getUpdatedAt()
         );
     }
 }
