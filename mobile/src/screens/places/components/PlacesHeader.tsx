@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme';
 
-/** 거점 등록 스택 공용 헤더 — 뒤로가기 + 타이틀. */
+/** 내 장소 등록 스택 공용 헤더 — 뒤로가기 + 타이틀. */
 export function PlacesHeader({ title, onBack }: { title: string; onBack: () => void }) {
   const insets = useSafeAreaInsets();
   return (

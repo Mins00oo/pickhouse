@@ -1,12 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AnchorPlace } from '@/types';
-import { ANCHOR_META, TRANSPORT_META } from '@/screens/houses/anchorMeta';
+import { MyPlace } from '@/types';
+import { PLACE_META, TRANSPORT_META } from '@/screens/houses/placeMeta';
 import { colors } from '@/theme';
 
-/** 등록된 거점 카드 — 아이콘 + 타입/주통근지 뱃지 + 이름(2줄) + 주소 + 이동수단 기준. */
-export function PlaceCard({ place, onEdit }: { place: AnchorPlace; onEdit: () => void }) {
-  const meta = ANCHOR_META[place.anchorType];
+/** 등록된 내 장소 카드 — 아이콘 + 타입/주통근지 뱃지 + 이름(2줄) + 주소 + 이동수단 기준. */
+export function PlaceCard({ place, onEdit }: { place: MyPlace; onEdit: () => void }) {
+  const meta = PLACE_META[place.placeType];
   const transport = TRANSPORT_META[place.transport];
   const name = place.label?.trim() || meta.label;
   const addr = place.address.roadAddress || place.address.jibunAddress || '';

@@ -14,13 +14,12 @@ async function processPendingPhotos(): Promise<void> {
   const pending = await photosRepo.listPending();
   for (const p of pending) {
     if (!p.localUri) continue;
-    if (!p.houseId && !p.residenceId) continue;
+    if (!p.houseId) continue;
     try {
       await photoUploader.upload({
         localUri: p.localUri,
         mimeType: p.mimeType,
         houseId: p.houseId,
-        residenceId: p.residenceId,
         photoId: p.id,
       });
     } catch {

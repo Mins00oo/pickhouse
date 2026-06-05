@@ -4,14 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HouseDetailScreen } from '../HouseDetailScreen';
 import { housesApi } from '@/api/houses.api';
 import { photosApi } from '@/api/photos.api';
-import { useAnchorDistances } from '@/queries/anchorDistances.queries';
+import { useMyPlaceDistances } from '@/queries/myPlaceDistances.queries';
 
 jest.mock('@/api/houses.api');
 jest.mock('@/api/photos.api');
-jest.mock('@/queries/anchorDistances.queries');
+jest.mock('@/queries/myPlaceDistances.queries');
 
 beforeEach(() => {
-  (useAnchorDistances as jest.Mock).mockReturnValue({ distances: [], isLoading: false });
+  (useMyPlaceDistances as jest.Mock).mockReturnValue({ distances: [], isLoading: false });
   (photosApi.listForHouse as jest.Mock).mockResolvedValue([]);
 });
 
@@ -89,7 +89,7 @@ describe('HouseDetailScreen', () => {
     expect(getByText('있음')).toBeTruthy(); // moisture=1 → 곰팡이 있음
   });
 
-  it('shows the anchor distance stat when a workplace is registered', async () => {
+  it('shows the myPlace distance stat when a workplace is registered', async () => {
     const house = {
       id: 'h3',
       address: { roadAddress: '서울시 마포구 3', jibunAddress: '', zonecode: '04000', latitude: 37.55, longitude: 126.9 },
@@ -97,8 +97,8 @@ describe('HouseDetailScreen', () => {
       photoIds: [], createdAt: '2026', updatedAt: '2026',
     };
     (housesApi.get as jest.Mock).mockResolvedValue(house);
-    (useAnchorDistances as jest.Mock).mockReturnValue({
-      distances: [{ anchorType: 'WORKPLACE', km: 3.2, source: 'driving', durationMin: 12 }],
+    (useMyPlaceDistances as jest.Mock).mockReturnValue({
+      distances: [{ placeType: 'WORKPLACE', km: 3.2, source: 'driving', durationMin: 12 }],
       isLoading: false,
     });
 
@@ -107,14 +107,14 @@ describe('HouseDetailScreen', () => {
       wrap(<HouseDetailScreen navigation={nav} route={{ params: { houseId: 'h3' }, key: 'k', name: 'HouseDetail' } as any} />),
     );
 
-    expect(await findByText('내 거점까지', {}, { timeout: 10000 })).toBeTruthy();
-    expect(getByTestId('anchor-distance-WORKPLACE')).toBeTruthy();
+    expect(await findByText('내 장소까지', {}, { timeout: 10000 })).toBeTruthy();
+    expect(getByTestId('myPlace-distance-WORKPLACE')).toBeTruthy();
     expect(getByText('3.2km')).toBeTruthy();
     expect(getByText('차 12분')).toBeTruthy();
     expect(getByText('직장')).toBeTruthy();
   });
 
-  it('hides the anchor distance card when no anchor is registered', async () => {
+  it('hides the myPlace distance card when no myPlace is registered', async () => {
     const house = {
       id: 'h4',
       address: { roadAddress: '서울시 마포구 4', jibunAddress: '', zonecode: '04000' },
@@ -129,7 +129,7 @@ describe('HouseDetailScreen', () => {
     );
 
     await findByText(/마포구/, {}, { timeout: 10000 });
-    expect(queryByTestId('anchor-distance-card')).toBeNull();
+    expect(queryByTestId('myPlace-distance-card')).toBeNull();
   });
 });
 

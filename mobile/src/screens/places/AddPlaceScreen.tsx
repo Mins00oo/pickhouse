@@ -4,10 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AnchorType, TransportMode } from '@/types';
+import { PlaceType, TransportMode } from '@/types';
 import { HouseStackParamList } from '@/navigation/types';
-import { ANCHOR_META, ANCHOR_ORDER } from '@/screens/houses/anchorMeta';
-import { useAnchorPlaces, useSavePlace } from '@/queries/anchorPlaces.queries';
+import { PLACE_META, PLACE_ORDER } from '@/screens/houses/placeMeta';
+import { useMyPlaces, useSavePlace } from '@/queries/myPlaces.queries';
 import { PlaceSearchResult, placeToAddress } from '@/integrations/kakaoPlaceSearch';
 import type { MapCoordinate } from '@/screens/houses/houseMapUtils';
 import { colors } from '@/theme';
@@ -20,11 +20,11 @@ type Props = NativeStackScreenProps<HouseStackParamList, 'AddPlace'>;
 export function AddPlaceScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const placeId = route.params?.placeId;
-  const { data: places = [] } = useAnchorPlaces();
+  const { data: places = [] } = useMyPlaces();
   const existing = useMemo(() => places.find((p) => p.id === placeId), [places, placeId]);
   const savePlace = useSavePlace();
 
-  const [kind, setKind] = useState<AnchorType>('WORKPLACE');
+  const [kind, setKind] = useState<PlaceType>('WORKPLACE');
   const [picked, setPicked] = useState<PlaceSearchResult | null>(null);
   const [label, setLabel] = useState('');
   const [transport, setTransport] = useState<TransportMode>('TRANSIT');
@@ -33,11 +33,11 @@ export function AddPlaceScreen({ navigation, route }: Props) {
   const [origin, setOrigin] = useState<MapCoordinate | undefined>(undefined);
   const [hydrated, setHydrated] = useState(false);
 
-  // 수정 모드: 비동기로 로드된 기존 거점 값으로 폼을 1회 프리필(외부 데이터 → 로컬 폼 동기화).
+  // 수정 모드: 비동기로 로드된 기존 내 장소 값으로 폼을 1회 프리필(외부 데이터 → 로컬 폼 동기화).
   useEffect(() => {
     if (hydrated || !existing) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setKind(existing.anchorType);
+    setKind(existing.placeType);
     setLabel(existing.label ?? '');
     setTransport(existing.transport);
     setIsPrimary(existing.isPrimary);
@@ -61,7 +61,7 @@ export function AddPlaceScreen({ navigation, route }: Props) {
   const display = picked
     ? { name: picked.placeName, category: picked.category, addr: picked.roadAddressName || picked.addressName }
     : existing
-      ? { name: existing.label || ANCHOR_META[existing.anchorType].label, category: undefined, addr: existing.address.roadAddress || existing.address.jibunAddress }
+      ? { name: existing.label || PLACE_META[existing.placeType].label, category: undefined, addr: existing.address.roadAddress || existing.address.jibunAddress }
       : null;
 
   const canSave = Boolean(picked || existing) && !savePlace.isPending;
@@ -77,7 +77,7 @@ export function AddPlaceScreen({ navigation, route }: Props) {
     if (!address) return;
     await savePlace.mutateAsync({
       id: existing?.id,
-      anchorType: kind,
+      placeType: kind,
       address,
       transport,
       isPrimary,
@@ -94,8 +94,8 @@ export function AddPlaceScreen({ navigation, route }: Props) {
         {/* 장소 종류 */}
         <Text style={styles.sectionTitle}>장소 종류</Text>
         <View style={styles.kindRow}>
-          {ANCHOR_ORDER.map((type) => {
-            const meta = ANCHOR_META[type];
+          {PLACE_ORDER.map((type) => {
+            const meta = PLACE_META[type];
             const on = type === kind;
             return (
               <Pressable

@@ -53,16 +53,4 @@ describe('photosApi', () => {
     expect(appendSpy).toHaveBeenCalledWith('id', 'p1');
   });
 
-  it('upload includes residenceId when supplied (not houseId)', async () => {
-    adapter.mockResolvedValueOnce({
-      data: { id: 'p2', residenceId: 'r1', remoteUrl: '/uploads/p2.jpg', takenAt: null, createdAt: '' },
-      status: 201, headers: {}, config: {},
-    });
-    await photosApi.upload({
-      localUri: 'file:///tmp/p2.jpg',
-      mimeType: 'image/png',
-      residenceId: 'r1',
-    });
-    expect(adapter.mock.calls[0]![0].url).toBe('/photos/upload');
-  });
 });

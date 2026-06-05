@@ -4,22 +4,22 @@ import { Card } from '@/components/Card';
 import { House } from '@/types';
 import { colors, spacing, typography } from '@/theme';
 import { formatKm } from '@/screens/houses/houseMapUtils';
-import { useAnchorDistances } from '@/queries/anchorDistances.queries';
-import { ANCHOR_META, TRANSPORT_META } from '@/screens/houses/anchorMeta';
+import { useMyPlaceDistances } from '@/queries/myPlaceDistances.queries';
+import { PLACE_META, TRANSPORT_META } from '@/screens/houses/placeMeta';
 
 /**
- * 집 ↔ 등록된 거점(직장/학교)의 거리 스탯.
+ * 집 ↔ 등록된 내 장소(직장/학교)의 거리 스탯.
  * 아이콘 + 큰 숫자 + 작은 보조(차 N분 / 직선거리)로 글랜서블하게.
- * 거점 미등록·좌표 없음이면 렌더하지 않는다.
+ * 내 장소 미등록·좌표 없음이면 렌더하지 않는다.
  */
-export function AnchorDistanceCard({ house }: { house: House }) {
-  const { distances, isLoading } = useAnchorDistances(house);
+export function MyPlaceDistanceCard({ house }: { house: House }) {
+  const { distances, isLoading } = useMyPlaceDistances(house);
 
   if (!isLoading && distances.length === 0) return null;
 
   return (
-    <Card testID="anchor-distance-card">
-      <Text style={typography.caption}>내 거점까지</Text>
+    <Card testID="myPlace-distance-card">
+      <Text style={typography.caption}>내 장소까지</Text>
       {isLoading && distances.length === 0 ? (
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={colors.muted} />
@@ -28,7 +28,7 @@ export function AnchorDistanceCard({ house }: { house: House }) {
       ) : (
         <View style={styles.stats}>
           {distances.map((d) => {
-            const meta = ANCHOR_META[d.anchorType];
+            const meta = PLACE_META[d.placeType];
             const transportLabel = TRANSPORT_META[d.mode ?? 'CAR'].label;
             const sub =
               d.source === 'driving'
@@ -41,7 +41,7 @@ export function AnchorDistanceCard({ house }: { house: House }) {
                     : transportLabel
                   : '직선거리';
             return (
-              <View key={d.anchorType} testID={`anchor-distance-${d.anchorType}`} style={styles.stat}>
+              <View key={d.placeType} testID={`myPlace-distance-${d.placeType}`} style={styles.stat}>
                 <View style={styles.statIcon}>
                   <Ionicons name={meta.icon as never} size={18} color={colors.primary} />
                 </View>

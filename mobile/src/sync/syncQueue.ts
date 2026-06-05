@@ -1,5 +1,5 @@
 import { syncQueueRepo } from '@/db/syncQueue.repo';
-import { AnchorPlace } from '@/types';
+import { MyPlace } from '@/types';
 
 export const syncQueue = {
   async queuePhotoFinalize(payload: { photoId: string; houseId?: string; remoteUrl: string }): Promise<void> {
@@ -11,28 +11,28 @@ export const syncQueue = {
     });
   },
 
-  async queueAnchorPlaceCreate(p: AnchorPlace): Promise<void> {
+  async queueMyPlaceCreate(p: MyPlace): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'create',
-      entity: 'anchorPlace',
+      entity: 'myPlace',
       entityId: p.id,
       payload: p,
     });
   },
 
-  async queueAnchorPlaceUpdate(id: string, patch: Partial<AnchorPlace>): Promise<void> {
+  async queueMyPlaceUpdate(id: string, patch: Partial<MyPlace>): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'update',
-      entity: 'anchorPlace',
+      entity: 'myPlace',
       entityId: id,
       payload: patch,
     });
   },
 
-  async queueAnchorPlaceDelete(id: string): Promise<void> {
+  async queueMyPlaceDelete(id: string): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'delete',
-      entity: 'anchorPlace',
+      entity: 'myPlace',
       entityId: id,
       payload: {},
     });

@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TransportMode } from '@/types';
-import { TRANSPORT_META, TRANSPORT_ORDER } from '@/screens/houses/anchorMeta';
+import { TRANSPORT_META, TRANSPORT_ORDER } from '@/screens/houses/placeMeta';
 import { colors } from '@/theme';
 
 /** 주 이동수단 선택 — 대중교통/자동차/도보 (자전거 제외). 통근시간 계산 기준. */

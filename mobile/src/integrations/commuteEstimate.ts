@@ -26,7 +26,7 @@ function estimate(mode: TransportMode, origin: MapCoordinate, dest: MapCoordinat
 }
 
 /**
- * 집↔거점 통근시간/거리.
+ * 집↔내 장소 통근시간/거리.
  * - 자동차(CAR): 카카오 자동차 길찾기 실측(도로거리 + 차 시간). 미가용 시 직선거리 추정으로 폴백.
  * - 대중교통/도보(TRANSIT/WALK): 직선거리 × 수단별 속도 추정(무료 길찾기 API가 자동차만 지원).
  */

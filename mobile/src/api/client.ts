@@ -10,6 +10,31 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   _retried?: boolean;
 }
 
+interface ApiErrorPayload {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+interface ApiEnvelope<T> {
+  success: boolean;
+  data: T | null;
+  error: ApiErrorPayload | null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
+  return (
+    isRecord(value) &&
+    typeof value.success === 'boolean' &&
+    Object.prototype.hasOwnProperty.call(value, 'data') &&
+    Object.prototype.hasOwnProperty.call(value, 'error')
+  );
+}
+
 function isAuthRefreshRoute(config: RetriableConfig): boolean {
   const url = config.url ?? '';
   return url === '/auth/login' || url === '/auth/refresh';
@@ -62,7 +87,15 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
   });
 
   client.interceptors.response.use(
-    (resp) => resp,
+    (resp) => {
+      if (isApiEnvelope(resp.data)) {
+        if (!resp.data.success) {
+          throw new Error(resp.data.error?.message ?? 'API 요청에 실패했습니다.');
+        }
+        resp.data = resp.data.data;
+      }
+      return resp;
+    },
     async (err: AxiosError) => {
       const cfg = err.config as RetriableConfig | undefined;
       if (err.response?.status === 401 && cfg && !cfg._retried && !isAuthRefreshRoute(cfg)) {
@@ -73,6 +106,10 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
           (cfg.headers as Record<string, string>).Authorization = `Bearer ${newToken}`;
           return client.request(cfg);
         }
+      }
+      const body = err.response?.data;
+      if (isApiEnvelope(body) && body.error?.message) {
+        err.message = body.error.message;
       }
       throw err;
     },

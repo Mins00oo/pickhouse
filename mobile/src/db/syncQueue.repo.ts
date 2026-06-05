@@ -1,7 +1,7 @@
 import { getDatabase } from './database';
 
 export type SyncOpType = 'create' | 'update' | 'delete';
-export type SyncEntity = 'house' | 'residence' | 'photo' | 'anchorPlace';
+export type SyncEntity = 'house' | 'photo' | 'myPlace';
 
 export interface SyncOp {
   id?: number;

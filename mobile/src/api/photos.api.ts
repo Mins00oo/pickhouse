@@ -5,14 +5,12 @@ export interface PhotoUploadInput {
   mimeType: string;
   photoId?: string;
   houseId?: string;
-  residenceId?: string;
   takenAt?: string;
 }
 
 export interface PhotoResponse {
   id: string;
   houseId?: string;
-  residenceId?: string;
   remoteUrl: string;
   takenAt?: string;
   createdAt: string;
@@ -29,7 +27,6 @@ export const photosApi = {
     } as unknown as Blob);
     if (input.photoId) form.append('id', input.photoId);
     if (input.houseId) form.append('houseId', input.houseId);
-    if (input.residenceId) form.append('residenceId', input.residenceId);
     if (input.takenAt) form.append('takenAt', input.takenAt);
 
     const res = await getApiClient().post<PhotoResponse>('/photos/upload', form, {

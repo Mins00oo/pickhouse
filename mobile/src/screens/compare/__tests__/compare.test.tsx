@@ -3,13 +3,13 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { housesApi } from '@/api/houses.api';
-import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { myPlacesRepo } from '@/db/myPlaces.repo';
 import { useAuthStore } from '@/stores/authStore';
 import { ComparePickerScreen } from '../ComparePickerScreen';
 import { CompareResultScreen } from '../CompareResultScreen';
 
 jest.mock('@/api/houses.api');
-jest.mock('@/db/anchorPlaces.repo');
+jest.mock('@/db/myPlaces.repo');
 
 const houses = [
   {
@@ -87,7 +87,7 @@ beforeEach(() => {
     status: 'authenticated',
   });
   (housesApi.list as jest.Mock).mockResolvedValue(houses);
-  (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
+  (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
 });
 
 describe('ComparePickerScreen', () => {

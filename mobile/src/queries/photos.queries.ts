@@ -20,7 +20,6 @@ function toPhoto(p: PhotoResponse): Photo {
   return {
     id: p.id,
     houseId: p.houseId,
-    residenceId: p.residenceId,
     remoteUrl: p.remoteUrl,
     takenAt: p.takenAt,
     uploadStatus: 'uploaded',

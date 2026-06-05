@@ -7,13 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { housesApi } from '@/api/houses.api';
-import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { myPlacesRepo } from '@/db/myPlaces.repo';
 import { useAuthStore } from '@/stores/authStore';
 import type { House } from '@/types';
 import { HomeMapScreen } from '../HomeMapScreen';
 
 jest.mock('@/api/houses.api');
-jest.mock('@/db/anchorPlaces.repo');
+jest.mock('@/db/myPlaces.repo');
 
 let queryClient: QueryClient | null = null;
 
@@ -121,7 +121,7 @@ beforeEach(() => {
   (Location.getCurrentPositionAsync as jest.Mock).mockResolvedValue({
     coords: { latitude: 37.5563, longitude: 126.9236 },
   });
-  (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
+  (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -450,10 +450,10 @@ describe('HomeMapScreen', () => {
   });
 
   it('shows a primary commute time on house cards and hides the register banner once registered', async () => {
-    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([
+    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([
       {
         id: 'w1',
-        anchorType: 'WORKPLACE',
+        placeType: 'WORKPLACE',
         label: '회사',
         address: { roadAddress: '', jibunAddress: '', zonecode: '', latitude: 37.5, longitude: 127.03 },
         transport: 'TRANSIT',

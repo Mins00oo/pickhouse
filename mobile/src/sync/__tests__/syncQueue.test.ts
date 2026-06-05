@@ -6,25 +6,25 @@ jest.mock('@/db/syncQueue.repo');
 beforeEach(() => jest.clearAllMocks());
 
 describe('syncQueue', () => {
-  it('queueAnchorPlaceCreate enqueues create+anchorPlace op', async () => {
+  it('queueMyPlaceCreate enqueues create+myPlace op', async () => {
     (syncQueueRepo.enqueue as jest.Mock).mockResolvedValueOnce(1);
-    await syncQueue.queueAnchorPlaceCreate({ id: 'a1' } as any);
+    await syncQueue.queueMyPlaceCreate({ id: 'a1' } as any);
     expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      opType: 'create', entity: 'anchorPlace', entityId: 'a1',
+      opType: 'create', entity: 'myPlace', entityId: 'a1',
     }));
   });
 
-  it('queueAnchorPlaceUpdate enqueues update op', async () => {
-    await syncQueue.queueAnchorPlaceUpdate('a2', { label: 'x' } as any);
+  it('queueMyPlaceUpdate enqueues update op', async () => {
+    await syncQueue.queueMyPlaceUpdate('a2', { label: 'x' } as any);
     expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      opType: 'update', entity: 'anchorPlace', entityId: 'a2',
+      opType: 'update', entity: 'myPlace', entityId: 'a2',
     }));
   });
 
-  it('queueAnchorPlaceDelete enqueues delete op', async () => {
-    await syncQueue.queueAnchorPlaceDelete('a3');
+  it('queueMyPlaceDelete enqueues delete op', async () => {
+    await syncQueue.queueMyPlaceDelete('a3');
     expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      opType: 'delete', entity: 'anchorPlace', entityId: 'a3',
+      opType: 'delete', entity: 'myPlace', entityId: 'a3',
     }));
   });
 

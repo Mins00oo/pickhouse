@@ -30,7 +30,7 @@ export const colors = {
   condGood: '#3DA773',
   condMid: '#E9B949',
   condBad: '#D94A4A',
-  // 거점 색상 — 직장=primary(그린), 학교=보라, 기타=coral
+  // 내 장소 색상 — 직장=primary(그린), 학교=보라, 기타=coral
   school: '#7B5FCC',
   schoolSoft: '#EFEAFB',
   // 카카오 검색 뱃지

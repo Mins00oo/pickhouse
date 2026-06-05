@@ -44,7 +44,7 @@ describe('useSyncOrchestrator', () => {
     await waitFor(() => expect(photosRepo.listPending).toHaveBeenCalled());
   });
 
-  it('skips pending photos without a house or residence id', async () => {
+  it('skips pending photos without a house id', async () => {
     (syncProcessor.processOnce as jest.Mock).mockResolvedValue(true);
     (networkMonitor.isOnline as jest.Mock).mockResolvedValue(true);
     (photosRepo.listPending as jest.Mock).mockResolvedValue([
@@ -82,7 +82,6 @@ describe('useSyncOrchestrator', () => {
         localUri: 'file:///tmp/p1.jpg',
         mimeType: 'image/jpeg',
         houseId: 'h1',
-        residenceId: undefined,
         photoId: 'p1',
       }),
     );

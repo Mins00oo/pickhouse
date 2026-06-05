@@ -19,6 +19,47 @@ describe('apiClient', () => {
     expect(cfg.headers.Authorization).toBe('Bearer abc');
   });
 
+  it('unwraps unified successful responses to response.data', async () => {
+    const client = createApiClient({
+      baseURL: 'http://test',
+      getAccessToken: async () => null,
+      onUnauthorized: async () => null,
+    });
+    client.defaults.adapter = jest.fn().mockResolvedValue({
+      data: { success: true, data: { id: 'h1' }, error: null },
+      status: 200,
+      headers: {},
+      config: {},
+    });
+
+    const res = await client.get('/houses/h1');
+
+    expect(res.data).toEqual({ id: 'h1' });
+  });
+
+  it('uses unified error message when the server returns an error envelope', async () => {
+    const client = createApiClient({
+      baseURL: 'http://test',
+      getAccessToken: async () => null,
+      onUnauthorized: async () => null,
+    });
+    const err: any = new Error('Request failed with status code 404');
+    err.response = {
+      status: 404,
+      data: {
+        success: false,
+        data: null,
+        error: { code: 'HOUSE_NOT_FOUND', message: '집 정보를 찾을 수 없습니다.', details: {} },
+      },
+      headers: {},
+      config: {},
+    };
+    err.config = {};
+    client.defaults.adapter = jest.fn().mockRejectedValue(err);
+
+    await expect(client.get('/houses/missing')).rejects.toThrow('집 정보를 찾을 수 없습니다.');
+  });
+
   it('on 401 calls onUnauthorized and retries with new token', async () => {
     let calls = 0;
     const onUnauthorized = jest.fn().mockResolvedValue('newtoken');

@@ -2,16 +2,16 @@ import type { ReactNode } from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
-import { anchorPlacesApi } from '@/api/anchorPlaces.api';
+import { myPlacesRepo } from '@/db/myPlaces.repo';
+import { myPlacesApi } from '@/api/myPlaces.api';
 import { housesApi } from '@/api/houses.api';
 import { useAuthStore } from '@/stores/authStore';
-import type { AnchorPlace } from '@/types';
+import type { MyPlace } from '@/types';
 import { MyScreen } from '@/screens/my/MyScreen';
 import { PlacesListScreen } from '../PlacesListScreen';
 
-jest.mock('@/db/anchorPlaces.repo');
-jest.mock('@/api/anchorPlaces.api');
+jest.mock('@/db/myPlaces.repo');
+jest.mock('@/api/myPlaces.api');
 jest.mock('@/api/houses.api');
 
 const wrap = (content: ReactNode) => {
@@ -27,9 +27,9 @@ const wrap = (content: ReactNode) => {
   );
 };
 
-const workplace: AnchorPlace = {
+const workplace: MyPlace = {
   id: 'w1',
-  anchorType: 'WORKPLACE',
+  placeType: 'WORKPLACE',
   label: '판교 회사',
   address: { roadAddress: '경기 성남시 분당구 판교역로 152', jibunAddress: '', zonecode: '', latitude: 37.4, longitude: 127.1 },
   transport: 'TRANSIT',
@@ -47,8 +47,8 @@ beforeEach(() => {
     status: 'authenticated',
   });
   (housesApi.list as jest.Mock).mockResolvedValue([]);
-  (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
-  (anchorPlacesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
+  (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
+  (myPlacesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
 });
 
 describe('MyScreen', () => {
@@ -58,12 +58,12 @@ describe('MyScreen', () => {
     const { findByText, getByTestId } = render(wrap(<MyScreen navigation={nav} route={{} as any} />));
 
     expect(await findByText('직장·학교를 등록해 보세요')).toBeTruthy();
-    fireEvent.press(getByTestId('my-register-anchor'));
+    fireEvent.press(getByTestId('my-register-myPlace'));
     expect(parentNav.navigate).toHaveBeenCalledWith('Places');
   });
 
   it('lists registered places with the 주 통근지 badge', async () => {
-    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplace]);
+    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplace]);
     const nav = { navigate: jest.fn(), getParent: () => ({ navigate: jest.fn() }) } as any;
     const { findByText, getByTestId } = render(wrap(<MyScreen navigation={nav} route={{} as any} />));
 
@@ -84,7 +84,7 @@ describe('PlacesListScreen', () => {
   });
 
   it('lists registered places and opens edit for a card', async () => {
-    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplace]);
+    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplace]);
     const nav = { navigate: jest.fn(), goBack: jest.fn() } as any;
     const { findByText, getByTestId } = render(wrap(<PlacesListScreen navigation={nav} route={{} as any} />));
 

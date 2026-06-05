@@ -1,25 +1,20 @@
 import { syncQueueRepo, SyncOp } from '@/db/syncQueue.repo';
-import { residencesApi } from '@/api/residences.api';
-import { anchorPlacesApi } from '@/api/anchorPlaces.api';
-import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { myPlacesApi } from '@/api/myPlaces.api';
+import { myPlacesRepo } from '@/db/myPlaces.repo';
 import { networkMonitor } from './networkMonitor';
 
 const MAX_ATTEMPTS = 5;
 
 async function processOp(op: SyncOp): Promise<void> {
-  if (op.entity === 'anchorPlace') {
+  if (op.entity === 'myPlace') {
     if (op.opType === 'create') {
-      await anchorPlacesApi.create(op.payload as never);
-      await anchorPlacesRepo.markClean(op.entityId);
+      await myPlacesApi.create(op.payload as never);
+      await myPlacesRepo.markClean(op.entityId);
     } else if (op.opType === 'update') {
-      await anchorPlacesApi.update(op.entityId, op.payload as never);
-      await anchorPlacesRepo.markClean(op.entityId);
+      await myPlacesApi.update(op.entityId, op.payload as never);
+      await myPlacesRepo.markClean(op.entityId);
     } else if (op.opType === 'delete') {
-      await anchorPlacesApi.remove(op.entityId);
-    }
-  } else if (op.entity === 'residence') {
-    if (op.opType === 'create') {
-      await residencesApi.get(op.entityId).catch(() => undefined);
+      await myPlacesApi.remove(op.entityId);
     }
   }
 }

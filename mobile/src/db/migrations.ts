@@ -45,40 +45,9 @@ export const migrations: Migration[] = [
         is_deleted INTEGER NOT NULL DEFAULT 0
       );
 
-      CREATE TABLE IF NOT EXISTS residences (
-        id TEXT PRIMARY KEY NOT NULL,
-        user_id TEXT NOT NULL,
-        address_json TEXT NOT NULL,
-        deal_type TEXT NOT NULL,
-        deposit INTEGER NOT NULL,
-        rent INTEGER,
-        maintenance_fee INTEGER,
-        area REAL,
-        contract_start_date TEXT NOT NULL,
-        contract_end_date TEXT NOT NULL,
-        landlord_memo TEXT,
-        meter_readings_json TEXT,
-        is_current INTEGER NOT NULL DEFAULT 0,
-        era_label TEXT,
-        memo TEXT,
-        water_pressure INTEGER,
-        sunlight INTEGER,
-        noise INTEGER,
-        insulation INTEGER,
-        ventilation INTEGER,
-        moisture INTEGER,
-        neighborhood INTEGER,
-        first_impression INTEGER,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        is_dirty INTEGER NOT NULL DEFAULT 0,
-        is_deleted INTEGER NOT NULL DEFAULT 0
-      );
-
       CREATE TABLE IF NOT EXISTS photos (
         id TEXT PRIMARY KEY NOT NULL,
         house_id TEXT,
-        residence_id TEXT,
         local_uri TEXT,
         remote_url TEXT,
         upload_status TEXT NOT NULL,
@@ -103,7 +72,6 @@ export const migrations: Migration[] = [
       );
 
       CREATE INDEX IF NOT EXISTS idx_photos_house ON photos(house_id);
-      CREATE INDEX IF NOT EXISTS idx_photos_residence ON photos(residence_id);
       CREATE INDEX IF NOT EXISTS idx_sync_queue_entity ON sync_queue(entity, entity_id);
     `,
   },
@@ -122,40 +90,27 @@ export const migrations: Migration[] = [
     `,
   },
   {
-    // 거점(직장/학교) 고정 슬롯. 로컬 전용 — is_dirty는 미래 서버 동기화 대비.
-    // (user_id, anchor_type) UNIQUE 로 타입별 1개 보장(UPSERT).
+    // 내 장소(직장/학교/기타) 최종 로컬 테이블. 로컬 DB는 초기화 가능하므로 과거 장소 테이블 이력은 남기지 않는다.
     version: 3,
     sql: `
-      CREATE TABLE IF NOT EXISTS anchor_places (
+      CREATE TABLE IF NOT EXISTS my_places (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
-        anchor_type TEXT NOT NULL,
+        place_type TEXT NOT NULL,
         label TEXT,
         address_json TEXT NOT NULL,
         latitude REAL,
         longitude REAL,
+        transport TEXT NOT NULL,
+        is_primary INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        is_dirty INTEGER NOT NULL DEFAULT 0
+        is_dirty INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER NOT NULL DEFAULT 0
       );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_anchor_user_type ON anchor_places(user_id, anchor_type);
-    `,
-  },
-  {
-    // 거점 모델 확장: 타입당 1개 → 여러 개 허용(직장/학교/기타). 이동수단 + 주 통근지 추가.
-    // 기존 행은 transport NULL(읽을 때 기본 CAR), is_primary 0.
-    version: 4,
-    sql: `
-      ALTER TABLE anchor_places ADD COLUMN transport TEXT;
-      ALTER TABLE anchor_places ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0;
-      DROP INDEX IF EXISTS idx_anchor_user_type;
-    `,
-  },
-  {
-    // 거점 서버 동기화 대비: 하드삭제 → 소프트삭제 전환(houses 미러). is_deleted 추가.
-    version: 5,
-    sql: `
-      ALTER TABLE anchor_places ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;
+
+      CREATE INDEX IF NOT EXISTS idx_my_places_user ON my_places(user_id);
+      CREATE INDEX IF NOT EXISTS idx_my_places_user_deleted ON my_places(user_id, is_deleted);
     `,
   },
 ];

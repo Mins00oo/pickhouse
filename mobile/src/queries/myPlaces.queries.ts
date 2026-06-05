@@ -1,25 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
-import { Address, AnchorPlace, AnchorType, TransportMode } from '@/types';
-import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
-import { anchorPlacesApi } from '@/api/anchorPlaces.api';
+import { Address, MyPlace, PlaceType, TransportMode } from '@/types';
+import { myPlacesRepo } from '@/db/myPlaces.repo';
+import { myPlacesApi } from '@/api/myPlaces.api';
 import { syncQueue } from '@/sync/syncQueue';
 import { attachCoords } from '@/integrations/kakaoGeocode';
 import { useAuthStore } from '@/stores/authStore';
 import { lastWriteWins } from '@/sync/conflictResolution';
 
-const ANCHORS_KEY = ['anchorPlaces'] as const;
+const MY_PLACES_KEY = ['myPlaces'] as const;
 
-export function useAnchorPlaces() {
+export function useMyPlaces() {
   const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
-    queryKey: ANCHORS_KEY,
+    queryKey: MY_PLACES_KEY,
     enabled: Boolean(userId),
     queryFn: async () => {
-      const local = userId ? await anchorPlacesRepo.listActive(userId) : [];
+      const local = userId ? await myPlacesRepo.listActive(userId) : [];
       try {
-        const remote = await anchorPlacesApi.list();
-        return mergeAnchors(local, remote);
+        const remote = await myPlacesApi.list();
+        return mergeMyPlaces(local, remote);
       } catch {
         return local;
       }
@@ -27,8 +27,8 @@ export function useAnchorPlaces() {
   });
 }
 
-function mergeAnchors(local: AnchorPlace[], remote: AnchorPlace[]): AnchorPlace[] {
-  const byId = new Map<string, AnchorPlace>();
+function mergeMyPlaces(local: MyPlace[], remote: MyPlace[]): MyPlace[] {
+  const byId = new Map<string, MyPlace>();
   for (const p of remote) byId.set(p.id, p);
   for (const p of local) {
     const r = byId.get(p.id);
@@ -40,14 +40,14 @@ function mergeAnchors(local: AnchorPlace[], remote: AnchorPlace[]): AnchorPlace[
 export interface SavePlaceInput {
   /** 있으면 수정, 없으면 신규. */
   id?: string;
-  anchorType: AnchorType;
+  placeType: PlaceType;
   address: Address;
   transport: TransportMode;
   isPrimary: boolean;
   label?: string;
 }
 
-/** 거점 추가/수정(공통). 주 통근지로 지정하면 같은 타입의 다른 주 통근지는 자동 해제. */
+/** 내 장소 추가/수정(공통). 주 통근지로 지정하면 같은 타입의 다른 주 통근지는 자동 해제. */
 export function useSavePlace() {
   const qc = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id) ?? 'unknown';
@@ -61,9 +61,9 @@ export function useSavePlace() {
       const now = new Date().toISOString();
       const isUpdate = Boolean(input.id);
       const id = input.id ?? Crypto.randomUUID();
-      const place: AnchorPlace = {
+      const place: MyPlace = {
         id,
-        anchorType: input.anchorType,
+        placeType: input.placeType,
         label: input.label,
         address: withCoords,
         transport: input.transport,
@@ -71,19 +71,19 @@ export function useSavePlace() {
         createdAt: now, // upsert는 충돌 시 created_at을 갱신하지 않음(최초 값 유지).
         updatedAt: now,
       };
-      await anchorPlacesRepo.upsert(place, userId);
+      await myPlacesRepo.upsert(place, userId);
       if (place.isPrimary) {
-        await anchorPlacesRepo.clearPrimaryExcept(userId, place.anchorType, id);
+        await myPlacesRepo.clearPrimaryExcept(userId, place.placeType, id);
       }
       if (isUpdate) {
-        await syncQueue.queueAnchorPlaceUpdate(id, place);
+        await syncQueue.queueMyPlaceUpdate(id, place);
       } else {
-        await syncQueue.queueAnchorPlaceCreate(place);
+        await syncQueue.queueMyPlaceCreate(place);
       }
       return place;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ANCHORS_KEY });
+      qc.invalidateQueries({ queryKey: MY_PLACES_KEY });
     },
   });
 }
@@ -92,11 +92,11 @@ export function useRemovePlace() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      await anchorPlacesRepo.softDelete(id);
-      await syncQueue.queueAnchorPlaceDelete(id);
+      await myPlacesRepo.softDelete(id);
+      await syncQueue.queueMyPlaceDelete(id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ANCHORS_KEY });
+      qc.invalidateQueries({ queryKey: MY_PLACES_KEY });
     },
   });
 }

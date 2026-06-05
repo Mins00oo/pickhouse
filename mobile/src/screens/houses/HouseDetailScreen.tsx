@@ -22,7 +22,7 @@ import {
   normalizeConditionLevel,
   roomTypeLabel,
 } from '@/domain/house';
-import { AnchorDistanceCard } from './components/AnchorDistanceCard';
+import { MyPlaceDistanceCard } from './components/MyPlaceDistanceCard';
 
 type Props = NativeStackScreenProps<HouseStackParamList, 'HouseDetail'>;
 
@@ -95,7 +95,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
           ) : null}
         </Card>
 
-        <AnchorDistanceCard house={house} />
+        <MyPlaceDistanceCard house={house} />
 
         {(house.area || house.floor || house.rooms || house.roomType || house.floorType || house.builtYear) && (
           <Card>

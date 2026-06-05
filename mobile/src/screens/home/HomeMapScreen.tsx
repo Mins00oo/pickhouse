@@ -32,8 +32,8 @@ import { NaverMapMarkerOverlay, NaverMapView, type NaverMapViewRef } from '@mj-s
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
-import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
-import { useHouseCommute, type PrimaryAnchors } from '@/queries/anchorDistances.queries';
+import { useMyPlaces } from '@/queries/myPlaces.queries';
+import { useHouseCommute, type PrimaryMyPlaces } from '@/queries/myPlaceDistances.queries';
 import {
   DEFAULT_MAP_CENTER,
   deriveCommuteMode,
@@ -45,7 +45,7 @@ import {
   getHouseMeta,
   getHouseSubtitle,
   getHouseTitle,
-  pickPrimaryAnchors,
+  pickPrimaryMyPlaces,
   type MapCoordinate,
   type MapRegion,
 } from '@/screens/houses/houseMapUtils';
@@ -188,9 +188,9 @@ export function HomeMapScreen({ navigation }: Props) {
   const [sortMode, setSortMode] = useState<HomeSortMode>('RECENT');
   const [sortOpen, setSortOpen] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
-  const { data: anchorPlaces = [] } = useAnchorPlaces();
-  const primaryAnchors = useMemo(() => pickPrimaryAnchors(anchorPlaces), [anchorPlaces]);
-  const commuteMode = useMemo(() => deriveCommuteMode(anchorPlaces), [anchorPlaces]);
+  const { data: myPlaces = [] } = useMyPlaces();
+  const primaryMyPlaces = useMemo(() => pickPrimaryMyPlaces(myPlaces), [myPlaces]);
+  const commuteMode = useMemo(() => deriveCommuteMode(myPlaces), [myPlaces]);
 
   const baseVisibleHouses = useMemo(() => {
     const inViewport = filterHousesByRegion(houses, viewportRegion);
@@ -437,9 +437,9 @@ export function HomeMapScreen({ navigation }: Props) {
           sheetRef={sheetRef}
           sheetHeight={sheetFixedHeight}
           bottomInset={insets.bottom}
-          primaryAnchors={primaryAnchors}
+          primaryMyPlaces={primaryMyPlaces}
           commuteMode={commuteMode}
-          onRegisterAnchor={openPlaces}
+          onRegisterMyPlace={openPlaces}
           onSelectHouse={setActiveHouseId}
           onOpenHouse={openHouseDetail}
           onCreateHouse={openHouseInput}
@@ -657,9 +657,9 @@ function HomeCarousel({
   sheetRef,
   sheetHeight,
   bottomInset,
-  primaryAnchors,
+  primaryMyPlaces,
   commuteMode,
-  onRegisterAnchor,
+  onRegisterMyPlace,
   onSelectHouse,
   onOpenHouse,
   onCreateHouse,
@@ -674,9 +674,9 @@ function HomeCarousel({
   sheetRef: RefObject<ComponentRef<typeof BottomSheet>>;
   sheetHeight: number;
   bottomInset: number;
-  primaryAnchors: PrimaryAnchors;
+  primaryMyPlaces: PrimaryMyPlaces;
   commuteMode: 'none' | 'work' | 'school' | 'both';
-  onRegisterAnchor: () => void;
+  onRegisterMyPlace: () => void;
   onSelectHouse: (houseId: string) => void;
   onOpenHouse: (houseId: string) => void;
   onCreateHouse: () => void;
@@ -768,7 +768,7 @@ function HomeCarousel({
             <Pressable
               testID="home-commute-register"
               accessibilityRole="button"
-              onPress={onRegisterAnchor}
+              onPress={onRegisterMyPlace}
               style={styles.commuteBannerBtn}
             >
               <Text style={styles.commuteBannerBtnText}>등록</Text>
@@ -793,7 +793,7 @@ function HomeCarousel({
                 key={house.id}
                 house={house}
                 active={house.id === selectedHouseId}
-                primaryAnchors={primaryAnchors}
+                primaryMyPlaces={primaryMyPlaces}
                 commuteMode={commuteMode}
                 onSelect={() => onSelectHouse(house.id)}
                 onOpen={() => onOpenHouse(house.id)}
@@ -1010,14 +1010,14 @@ const CARD_CHECKS: { key: keyof House; icon: string }[] = [
 function HomeHouseCard({
   house,
   active,
-  primaryAnchors,
+  primaryMyPlaces,
   commuteMode,
   onSelect,
   onOpen,
 }: {
   house: House;
   active: boolean;
-  primaryAnchors: PrimaryAnchors;
+  primaryMyPlaces: PrimaryMyPlaces;
   commuteMode: 'none' | 'work' | 'school' | 'both';
   onSelect: () => void;
   onOpen: () => void;
@@ -1026,7 +1026,7 @@ function HomeHouseCard({
   const visitedLabel = Number.isNaN(visitedAt.getTime())
     ? '방문'
     : `${visitedAt.getMonth() + 1}/${visitedAt.getDate()} 방문`;
-  const commute = useHouseCommute(house, primaryAnchors);
+  const commute = useHouseCommute(house, primaryMyPlaces);
   const showWork = (commuteMode === 'work' || commuteMode === 'both') && typeof commute.work === 'number';
   const showSchool = (commuteMode === 'school' || commuteMode === 'both') && typeof commute.school === 'number';
 
@@ -1793,7 +1793,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: 'rgba(255,255,255,0.94)',
   },
-  anchorNudgeWrap: {
+  myPlaceNudgeWrap: {
     position: 'absolute',
     left: 14,
     right: 14,
