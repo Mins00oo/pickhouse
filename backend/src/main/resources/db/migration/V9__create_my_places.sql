@@ -1,0 +1,20 @@
+CREATE TABLE my_places (
+    id                       CHAR(36)      NOT NULL PRIMARY KEY,
+    user_id                  CHAR(36)      NOT NULL,
+    address_road_address     VARCHAR(255)  NULL,
+    address_jibun_address    VARCHAR(255)  NULL,
+    address_zonecode         VARCHAR(10)   NULL,
+    address_latitude         DECIMAL(10,7) NULL,
+    address_longitude        DECIMAL(10,7) NULL,
+    address_detail           VARCHAR(255)  NULL,
+    place_type              VARCHAR(20)   NOT NULL,
+    label                    VARCHAR(100)  NULL,
+    transport                VARCHAR(20)   NOT NULL,
+    is_primary               TINYINT(1)    NOT NULL DEFAULT 0,
+    created_at               DATETIME(3)   NOT NULL,
+    updated_at               DATETIME(3)   NOT NULL,
+    deleted_at               DATETIME(3)   NULL,
+    KEY ix_my_places_user (user_id),
+    KEY ix_my_places_user_deleted (user_id, deleted_at),
+    CONSTRAINT fk_my_places_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
