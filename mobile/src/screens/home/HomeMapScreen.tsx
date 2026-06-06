@@ -32,9 +32,8 @@ import { NaverMapMarkerOverlay, NaverMapView, type NaverMapViewRef } from '@mj-s
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
-import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
-import { useHouseCommute, type PrimaryAnchors } from '@/queries/anchorDistances.queries';
-import { SAMPLE_HOUSES } from '@/screens/houses/houseSampleData';
+import { useMyPlaces } from '@/queries/myPlaces.queries';
+import { useHouseCommute, type PrimaryMyPlaces } from '@/queries/myPlaceDistances.queries';
 import {
   DEFAULT_MAP_CENTER,
   deriveCommuteMode,
@@ -46,7 +45,7 @@ import {
   getHouseMeta,
   getHouseSubtitle,
   getHouseTitle,
-  pickPrimaryAnchors,
+  pickPrimaryMyPlaces,
   type MapCoordinate,
   type MapRegion,
 } from '@/screens/houses/houseMapUtils';
@@ -128,15 +127,9 @@ const CURRENT_LOCATION_MARKER_IMAGE = require('../../../assets/map-markers/marke
 // Phase 2 스캐폴드: 네이버 커스텀 지도 스타일. 값이 있을 때만 적용한다.
 // customStyleId 는 네이티브에 연결되므로 최초 활성화 시 EAS 재빌드가 한 번 필요하다.
 const NAVER_MAP_STYLE_ID = process.env.EXPO_PUBLIC_NAVER_MAP_STYLE_ID ?? '';
-const SAMPLE_MAP_CENTER = getAverageCoordinate(SAMPLE_HOUSES) ?? DEFAULT_MAP_CENTER;
 const INITIAL_CAMERA = {
   latitude: DEFAULT_MAP_CENTER.latitude,
   longitude: DEFAULT_MAP_CENTER.longitude,
-  zoom: MAP_INITIAL_ZOOM,
-};
-const SAMPLE_INITIAL_CAMERA = {
-  latitude: SAMPLE_MAP_CENTER.latitude,
-  longitude: SAMPLE_MAP_CENTER.longitude,
   zoom: MAP_INITIAL_ZOOM,
 };
 const FILTER_SNAP_HEIGHTS: Record<FilterSheetSnap, number> = {
@@ -181,8 +174,7 @@ export function HomeMapScreen({ navigation }: Props) {
   const cameraIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasCenteredOnUser = useRef(false);
   const { data = [] } = useHouses();
-  const isSampleMode = data.length === 0;
-  const houses = isSampleMode ? SAMPLE_HOUSES : data;
+  const houses = data;
   const [query, setQuery] = useState('');
   const [activeHouseId, setActiveHouseId] = useState<string | null>(null);
   const [viewportRegion, setViewportRegion] = useState<MapRegion | null>(null);
@@ -196,9 +188,9 @@ export function HomeMapScreen({ navigation }: Props) {
   const [sortMode, setSortMode] = useState<HomeSortMode>('RECENT');
   const [sortOpen, setSortOpen] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
-  const { data: anchorPlaces = [] } = useAnchorPlaces();
-  const primaryAnchors = useMemo(() => pickPrimaryAnchors(anchorPlaces), [anchorPlaces]);
-  const commuteMode = useMemo(() => deriveCommuteMode(anchorPlaces), [anchorPlaces]);
+  const { data: myPlaces = [] } = useMyPlaces();
+  const primaryMyPlaces = useMemo(() => pickPrimaryMyPlaces(myPlaces), [myPlaces]);
+  const commuteMode = useMemo(() => deriveCommuteMode(myPlaces), [myPlaces]);
 
   const baseVisibleHouses = useMemo(() => {
     const inViewport = filterHousesByRegion(houses, viewportRegion);
@@ -256,7 +248,7 @@ export function HomeMapScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    if (isSampleMode || !userLocation || hasCenteredOnUser.current) return;
+    if (!userLocation || hasCenteredOnUser.current) return;
     hasCenteredOnUser.current = true;
     mapRef.current?.animateCameraTo({
       latitude: userLocation.latitude,
@@ -264,7 +256,7 @@ export function HomeMapScreen({ navigation }: Props) {
       zoom: 15,
       duration: 500,
     });
-  }, [isSampleMode, userLocation]);
+  }, [userLocation]);
 
   const handleCameraIdle = useCallback((params: CameraIdleParams) => {
     setMapZoomLevel((current) => params.zoom ?? current);
@@ -350,7 +342,7 @@ export function HomeMapScreen({ navigation }: Props) {
         ref={mapRef}
         testID="house-map-view"
         style={StyleSheet.absoluteFill}
-        initialCamera={isSampleMode ? SAMPLE_INITIAL_CAMERA : INITIAL_CAMERA}
+        initialCamera={INITIAL_CAMERA}
         animationDuration={260}
         mapType={mapType}
         {...(NAVER_MAP_STYLE_ID
@@ -445,9 +437,9 @@ export function HomeMapScreen({ navigation }: Props) {
           sheetRef={sheetRef}
           sheetHeight={sheetFixedHeight}
           bottomInset={insets.bottom}
-          primaryAnchors={primaryAnchors}
+          primaryMyPlaces={primaryMyPlaces}
           commuteMode={commuteMode}
-          onRegisterAnchor={openPlaces}
+          onRegisterMyPlace={openPlaces}
           onSelectHouse={setActiveHouseId}
           onOpenHouse={openHouseDetail}
           onCreateHouse={openHouseInput}
@@ -665,9 +657,9 @@ function HomeCarousel({
   sheetRef,
   sheetHeight,
   bottomInset,
-  primaryAnchors,
+  primaryMyPlaces,
   commuteMode,
-  onRegisterAnchor,
+  onRegisterMyPlace,
   onSelectHouse,
   onOpenHouse,
   onCreateHouse,
@@ -682,9 +674,9 @@ function HomeCarousel({
   sheetRef: RefObject<ComponentRef<typeof BottomSheet>>;
   sheetHeight: number;
   bottomInset: number;
-  primaryAnchors: PrimaryAnchors;
+  primaryMyPlaces: PrimaryMyPlaces;
   commuteMode: 'none' | 'work' | 'school' | 'both';
-  onRegisterAnchor: () => void;
+  onRegisterMyPlace: () => void;
   onSelectHouse: (houseId: string) => void;
   onOpenHouse: (houseId: string) => void;
   onCreateHouse: () => void;
@@ -776,7 +768,7 @@ function HomeCarousel({
             <Pressable
               testID="home-commute-register"
               accessibilityRole="button"
-              onPress={onRegisterAnchor}
+              onPress={onRegisterMyPlace}
               style={styles.commuteBannerBtn}
             >
               <Text style={styles.commuteBannerBtnText}>등록</Text>
@@ -801,7 +793,7 @@ function HomeCarousel({
                 key={house.id}
                 house={house}
                 active={house.id === selectedHouseId}
-                primaryAnchors={primaryAnchors}
+                primaryMyPlaces={primaryMyPlaces}
                 commuteMode={commuteMode}
                 onSelect={() => onSelectHouse(house.id)}
                 onOpen={() => onOpenHouse(house.id)}
@@ -1018,14 +1010,14 @@ const CARD_CHECKS: { key: keyof House; icon: string }[] = [
 function HomeHouseCard({
   house,
   active,
-  primaryAnchors,
+  primaryMyPlaces,
   commuteMode,
   onSelect,
   onOpen,
 }: {
   house: House;
   active: boolean;
-  primaryAnchors: PrimaryAnchors;
+  primaryMyPlaces: PrimaryMyPlaces;
   commuteMode: 'none' | 'work' | 'school' | 'both';
   onSelect: () => void;
   onOpen: () => void;
@@ -1034,7 +1026,7 @@ function HomeHouseCard({
   const visitedLabel = Number.isNaN(visitedAt.getTime())
     ? '방문'
     : `${visitedAt.getMonth() + 1}/${visitedAt.getDate()} 방문`;
-  const commute = useHouseCommute(house, primaryAnchors);
+  const commute = useHouseCommute(house, primaryMyPlaces);
   const showWork = (commuteMode === 'work' || commuteMode === 'both') && typeof commute.work === 'number';
   const showSchool = (commuteMode === 'school' || commuteMode === 'both') && typeof commute.school === 'number';
 
@@ -1801,7 +1793,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: 'rgba(255,255,255,0.94)',
   },
-  anchorNudgeWrap: {
+  myPlaceNudgeWrap: {
     position: 'absolute',
     left: 14,
     right: 14,

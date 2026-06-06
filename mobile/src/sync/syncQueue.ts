@@ -1,34 +1,7 @@
 import { syncQueueRepo } from '@/db/syncQueue.repo';
-import { AnchorPlace, House } from '@/types';
+import { MyPlace } from '@/types';
 
 export const syncQueue = {
-  async queueHouseCreate(h: House): Promise<void> {
-    await syncQueueRepo.enqueue({
-      opType: 'create',
-      entity: 'house',
-      entityId: h.id,
-      payload: h,
-    });
-  },
-
-  async queueHouseUpdate(id: string, patch: Partial<House>): Promise<void> {
-    await syncQueueRepo.enqueue({
-      opType: 'update',
-      entity: 'house',
-      entityId: id,
-      payload: patch,
-    });
-  },
-
-  async queueHouseDelete(id: string): Promise<void> {
-    await syncQueueRepo.enqueue({
-      opType: 'delete',
-      entity: 'house',
-      entityId: id,
-      payload: {},
-    });
-  },
-
   async queuePhotoFinalize(payload: { photoId: string; houseId?: string; remoteUrl: string }): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'create',
@@ -38,28 +11,28 @@ export const syncQueue = {
     });
   },
 
-  async queueAnchorPlaceCreate(p: AnchorPlace): Promise<void> {
+  async queueMyPlaceCreate(p: MyPlace): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'create',
-      entity: 'anchorPlace',
+      entity: 'myPlace',
       entityId: p.id,
       payload: p,
     });
   },
 
-  async queueAnchorPlaceUpdate(id: string, patch: Partial<AnchorPlace>): Promise<void> {
+  async queueMyPlaceUpdate(id: string, patch: Partial<MyPlace>): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'update',
-      entity: 'anchorPlace',
+      entity: 'myPlace',
       entityId: id,
       payload: patch,
     });
   },
 
-  async queueAnchorPlaceDelete(id: string): Promise<void> {
+  async queueMyPlaceDelete(id: string): Promise<void> {
     await syncQueueRepo.enqueue({
       opType: 'delete',
-      entity: 'anchorPlace',
+      entity: 'myPlace',
       entityId: id,
       payload: {},
     });

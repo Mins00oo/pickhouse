@@ -34,7 +34,6 @@ CREATE TABLE houses (
     neighborhood       TINYINT      NULL,
     first_impression   TINYINT      NULL,
     memo               TEXT         NULL,
-    promoted_at        DATETIME(3)  NULL,
     created_at         DATETIME(3)  NOT NULL,
     updated_at         DATETIME(3)  NOT NULL,
     deleted_at         DATETIME(3)  NULL,

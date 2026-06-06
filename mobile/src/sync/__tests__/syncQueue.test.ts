@@ -6,25 +6,32 @@ jest.mock('@/db/syncQueue.repo');
 beforeEach(() => jest.clearAllMocks());
 
 describe('syncQueue', () => {
-  it('queueHouseCreate enqueues create+house op', async () => {
+  it('queueMyPlaceCreate enqueues create+myPlace op', async () => {
     (syncQueueRepo.enqueue as jest.Mock).mockResolvedValueOnce(1);
-    await syncQueue.queueHouseCreate({ id: 'h1' } as any);
+    await syncQueue.queueMyPlaceCreate({ id: 'a1' } as any);
     expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      opType: 'create', entity: 'house', entityId: 'h1',
+      opType: 'create', entity: 'myPlace', entityId: 'a1',
     }));
   });
 
-  it('queueHouseUpdate enqueues update op', async () => {
-    await syncQueue.queueHouseUpdate('h2', { memo: 'x' } as any);
+  it('queueMyPlaceUpdate enqueues update op', async () => {
+    await syncQueue.queueMyPlaceUpdate('a2', { label: 'x' } as any);
     expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      opType: 'update', entity: 'house', entityId: 'h2',
+      opType: 'update', entity: 'myPlace', entityId: 'a2',
     }));
   });
 
-  it('queueHouseDelete enqueues delete op', async () => {
-    await syncQueue.queueHouseDelete('h3');
+  it('queueMyPlaceDelete enqueues delete op', async () => {
+    await syncQueue.queueMyPlaceDelete('a3');
     expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      opType: 'delete', entity: 'house', entityId: 'h3',
+      opType: 'delete', entity: 'myPlace', entityId: 'a3',
+    }));
+  });
+
+  it('queuePhotoFinalize enqueues create+photo op', async () => {
+    await syncQueue.queuePhotoFinalize({ photoId: 'p1', houseId: 'h1', remoteUrl: 'http://x/y.jpg' });
+    expect(syncQueueRepo.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      opType: 'create', entity: 'photo', entityId: 'p1',
     }));
   });
 });

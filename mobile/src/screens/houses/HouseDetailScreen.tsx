@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { ScrollView, Text, View, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,9 +6,9 @@ import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { useHouse, useDeleteHouse } from '@/queries/houses.queries';
-import { House, HouseStackParamList, Photo } from '@/types';
+import { useHousePhotos } from '@/queries/photos.queries';
+import { House, HouseStackParamList } from '@/types';
 import { colors, spacing, typography } from '@/theme';
-import { photosRepo } from '@/db/photos.repo';
 import {
   builtYearLabel,
   CONDITION_KEYS,
@@ -23,7 +22,7 @@ import {
   normalizeConditionLevel,
   roomTypeLabel,
 } from '@/domain/house';
-import { AnchorDistanceCard } from './components/AnchorDistanceCard';
+import { MyPlaceDistanceCard } from './components/MyPlaceDistanceCard';
 
 type Props = NativeStackScreenProps<HouseStackParamList, 'HouseDetail'>;
 
@@ -31,11 +30,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
   const { houseId } = route.params;
   const { data: house, isLoading } = useHouse(houseId);
   const del = useDeleteHouse();
-  const [photos, setPhotos] = useState<Photo[]>([]);
-
-  useEffect(() => {
-    void photosRepo.listForHouse(houseId).then(setPhotos);
-  }, [houseId]);
+  const { data: photos = [] } = useHousePhotos(houseId);
 
   if (isLoading || !house) {
     return (
@@ -100,7 +95,7 @@ export function HouseDetailScreen({ route, navigation }: Props) {
           ) : null}
         </Card>
 
-        <AnchorDistanceCard house={house} />
+        <MyPlaceDistanceCard house={house} />
 
         {(house.area || house.floor || house.rooms || house.roomType || house.floorType || house.builtYear) && (
           <Card>

@@ -98,7 +98,12 @@ export interface House {
   updatedAt: string;
 }
 
-export type HouseDraft = Omit<House, 'id' | 'photoIds' | 'createdAt' | 'updatedAt'> & {
-  id?: string;
-  photoIds?: string[];
+export type HouseDraft = Omit<House, 'id' | 'photoIds' | 'createdAt' | 'updatedAt'>;
+
+export type HouseRequestFields = Omit<House, 'id' | 'photoIds' | 'createdAt' | 'updatedAt'>;
+
+export type CreateHouseRequest = Omit<HouseRequestFields, 'rent'> & {
+  rent: number;
 };
+
+export type UpdateHouseRequest = Partial<CreateHouseRequest>;

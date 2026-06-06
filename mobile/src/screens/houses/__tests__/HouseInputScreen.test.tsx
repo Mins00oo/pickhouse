@@ -3,14 +3,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HouseInputScreen } from '../HouseInputScreen';
 import { useAuthStore } from '@/stores/authStore';
-import { housesRepo } from '@/db/houses.repo';
 import { housesApi } from '@/api/houses.api';
-import { syncQueue } from '@/sync/syncQueue';
 import { geocodeAddress } from '@/integrations/kakaoGeocode';
+import { cameraHelper } from '@/photos/cameraHelper';
+import { photosRepo } from '@/db/photos.repo';
 
-jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
-jest.mock('@/sync/syncQueue');
 jest.mock('@/db/photos.repo');
 jest.mock('@/photos/cameraHelper');
 
@@ -67,6 +65,13 @@ const wrap = (c: React.ReactNode) => {
 beforeEach(() => {
   jest.clearAllMocks();
   (geocodeAddress as jest.Mock).mockResolvedValue({ latitude: 37.556, longitude: 126.901 });
+  (housesApi.create as jest.Mock).mockImplementation((body) =>
+    Promise.resolve({ ...body, id: body?.id ?? 'new', photoIds: [] }),
+  );
+  (housesApi.update as jest.Mock).mockImplementation((id, patch) =>
+    Promise.resolve({ id, ...patch, photoIds: [] }),
+  );
+  (housesApi.list as jest.Mock).mockResolvedValue([]);
   useAuthStore.setState({
     user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
@@ -130,7 +135,7 @@ describe('HouseInputScreen (위저드)', () => {
     const nav = navMock();
     const { getByTestId } = render(wrap(<HouseInputScreen navigation={nav} route={route()} />));
     fireEvent.press(getByTestId('save-button'));
-    await waitFor(() => expect(housesRepo.insert).not.toHaveBeenCalled());
+    await waitFor(() => expect(housesApi.create).not.toHaveBeenCalled());
     expect((nav as { goBack: jest.Mock }).goBack).not.toHaveBeenCalled();
   });
 
@@ -146,9 +151,9 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.changeText(getByTestId('amount-월세'), '50');
     fireEvent.press(getByTestId('save-button'));
 
-    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
     expect(geocodeAddress).toHaveBeenCalledWith('서울 용산구 청파로47길 22');
-    expect(housesRepo.insert).toHaveBeenCalledWith(
+    expect(housesApi.create).toHaveBeenCalledWith(
       expect.objectContaining({
         nickname: '청파동 빌라',
         dealType: 'WOLSE',
@@ -156,9 +161,46 @@ describe('HouseInputScreen (위저드)', () => {
         rent: 50,
         address: expect.objectContaining({ latitude: 37.556, longitude: 126.901 }),
       }),
-      'u1',
     );
-    expect(syncQueue.queueHouseCreate).toHaveBeenCalled();
+    expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
+  });
+
+  it('saves a new house without a client id and attaches local photos to the server id', async () => {
+    (cameraHelper.takePhoto as jest.Mock).mockResolvedValueOnce({
+      id: 'p-local',
+      localUri: 'file:///tmp/p-local.jpg',
+      mimeType: 'image/jpeg',
+    });
+    (housesApi.create as jest.Mock).mockResolvedValueOnce({
+      id: 'server-h1',
+      address: {},
+      dealType: 'WOLSE',
+      deposit: 1000,
+      rent: 50,
+      photoIds: [],
+      createdAt: '2026-06-04T00:00:00.000Z',
+      updatedAt: '2026-06-04T00:00:00.000Z',
+    });
+    const nav = navMock();
+    const { getByTestId, getAllByRole, getAllByPlaceholderText, findByTestId } = render(
+      wrap(<HouseInputScreen navigation={nav} route={route()} />),
+    );
+    fireEvent.changeText(getByTestId('nickname-input'), 'test house');
+    await pickAddress(getByTestId, findByTestId);
+    const tabs = getAllByRole('tab');
+    fireEvent.press(tabs[1]);
+    const amountInputs = getAllByPlaceholderText('0');
+    fireEvent.changeText(amountInputs[0], '1000');
+    fireEvent.changeText(amountInputs[1], '50');
+    fireEvent.press(tabs[3]);
+    fireEvent.press(getByTestId('photo-add-button'));
+    await waitFor(() => expect(cameraHelper.takePhoto).toHaveBeenCalledWith(undefined));
+    fireEvent.press(getByTestId('save-button'));
+
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
+    const [body] = (housesApi.create as jest.Mock).mock.calls[0]!;
+    expect(body).not.toHaveProperty('id');
+    await waitFor(() => expect(photosRepo.attachToHouse).toHaveBeenCalledWith(['p-local'], 'server-h1'));
     expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
   });
 
@@ -219,12 +261,11 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.changeText(getByTestId('utility-전기'), '2');
     fireEvent.press(getByTestId('save-button'));
 
-    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
-    expect(housesRepo.insert).toHaveBeenCalledWith(
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
+    expect(housesApi.create).toHaveBeenCalledWith(
       expect.objectContaining({
         utilityEstimates: expect.objectContaining({ ELECTRIC: 2 }),
       }),
-      'u1',
     );
   });
 
@@ -257,8 +298,8 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.press(getByTestId('switch-엘리베이터'));
     fireEvent.press(getByTestId('save-button'));
 
-    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
-    expect(housesRepo.insert).toHaveBeenCalledWith(
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
+    expect(housesApi.create).toHaveBeenCalledWith(
       expect.objectContaining({
         roomType: 'ONE_AND_HALF',
         area: 9,
@@ -268,7 +309,6 @@ describe('HouseInputScreen (위저드)', () => {
         hasElevator: true,
         floorType: 'GROUND',
       }),
-      'u1',
     );
   });
 
@@ -284,10 +324,9 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.changeText(getByTestId('amount-전세금'), '18000');
     fireEvent.press(getByTestId('save-button'));
 
-    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
-    expect(housesRepo.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ dealType: 'JEONSE', deposit: 18000, rent: undefined }),
-      'u1',
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
+    expect(housesApi.create).toHaveBeenCalledWith(
+      expect.objectContaining({ dealType: 'JEONSE', deposit: 18000, rent: 0 }),
     );
   });
 
@@ -304,8 +343,8 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.changeText(getByTestId('amount-월세'), '50');
     fireEvent.press(getByTestId('save-button'));
 
-    await waitFor(() => expect(housesRepo.insert).toHaveBeenCalled());
-    const [house] = (housesRepo.insert as jest.Mock).mock.calls[0]!;
+    await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
+    const [house] = (housesApi.create as jest.Mock).mock.calls[0]!;
     expect(house.address.latitude).toBeUndefined();
     expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
   });
@@ -335,8 +374,7 @@ describe('HouseInputScreen (위저드)', () => {
       createdAt: '2026-05-16T00:00:00.000Z',
       updatedAt: '2026-05-16T00:00:00.000Z',
     };
-    (housesRepo.findById as jest.Mock).mockResolvedValue(existing);
-    (housesApi.get as jest.Mock).mockRejectedValue(new Error('offline'));
+    (housesApi.get as jest.Mock).mockResolvedValue(existing);
     const nav = navMock();
     const { getByTestId, findByDisplayValue } = render(
       wrap(<HouseInputScreen navigation={nav} route={route({ houseId: 'h1' })} />),
@@ -348,11 +386,8 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.changeText(getByTestId('amount-월세'), '60');
     fireEvent.press(getByTestId('save-button'));
 
-    await waitFor(() => expect(housesRepo.update).toHaveBeenCalled());
-    expect(housesRepo.insert).not.toHaveBeenCalled();
-    expect(syncQueue.queueHouseUpdate).toHaveBeenCalledWith(
-      'h1',
-      expect.objectContaining({ rent: 60, photoIds: ['p1'] }),
-    );
+    await waitFor(() => expect(housesApi.update).toHaveBeenCalled());
+    expect(housesApi.create).not.toHaveBeenCalled();
+    expect(housesApi.update).toHaveBeenCalledWith('h1', expect.objectContaining({ rent: 60 }));
   });
 });

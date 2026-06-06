@@ -1,4 +1,4 @@
-import { AnchorDistance, AnchorPlace, House } from '@/types';
+import { MyPlaceDistance, MyPlace, House } from '@/types';
 import { dealTypeLabel } from '@/domain/house';
 
 export type MapCoordinate = {
@@ -23,8 +23,8 @@ export function getHouseCoordinate(house: House): MapCoordinate | null {
   return { latitude, longitude };
 }
 
-export function getAnchorCoordinate(anchor: AnchorPlace): MapCoordinate | null {
-  const { latitude, longitude } = anchor.address;
+export function getMyPlaceCoordinate(myPlace: MyPlace): MapCoordinate | null {
+  const { latitude, longitude } = myPlace.address;
   if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
@@ -53,7 +53,7 @@ export function formatKm(km: number): string {
 }
 
 /** 거리 + 소요시간 한 줄. driving=차 N분, estimate=약 N분, straight-line="직선거리 약". */
-export function formatAnchorDistance(d: AnchorDistance): string {
+export function formatMyPlaceDistance(d: MyPlaceDistance): string {
   const dist = formatKm(d.km);
   if (d.source === 'driving') {
     if (typeof d.durationMin === 'number') return `${dist} · 차 ${d.durationMin}분`;
@@ -70,18 +70,18 @@ export function formatAnchorDistance(d: AnchorDistance): string {
  * 메인 카드에 표시할 '주 통근지' 추출 — 타입별 isPrimary 장소.
  * 기타(OTHER)는 카드에 표시하지 않으므로 무시한다.
  */
-export function pickPrimaryAnchors(places: AnchorPlace[]): {
-  work: AnchorPlace | null;
-  school: AnchorPlace | null;
+export function pickPrimaryMyPlaces(places: MyPlace[]): {
+  work: MyPlace | null;
+  school: MyPlace | null;
 } {
-  const work = places.find((p) => p.anchorType === 'WORKPLACE' && p.isPrimary) ?? null;
-  const school = places.find((p) => p.anchorType === 'SCHOOL' && p.isPrimary) ?? null;
+  const work = places.find((p) => p.placeType === 'WORKPLACE' && p.isPrimary) ?? null;
+  const school = places.find((p) => p.placeType === 'SCHOOL' && p.isPrimary) ?? null;
   return { work, school };
 }
 
 /** 주 통근지 직장/학교 유무에서 카드 통근 표시 모드를 파생. */
-export function deriveCommuteMode(places: AnchorPlace[]): 'none' | 'work' | 'school' | 'both' {
-  const { work, school } = pickPrimaryAnchors(places);
+export function deriveCommuteMode(places: MyPlace[]): 'none' | 'work' | 'school' | 'both' {
+  const { work, school } = pickPrimaryMyPlaces(places);
   if (work && school) return 'both';
   if (work) return 'work';
   if (school) return 'school';

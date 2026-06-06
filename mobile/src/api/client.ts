@@ -10,6 +10,31 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   _retried?: boolean;
 }
 
+interface ApiErrorPayload {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+interface ApiEnvelope<T> {
+  success: boolean;
+  data: T | null;
+  error: ApiErrorPayload | null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
+  return (
+    isRecord(value) &&
+    typeof value.success === 'boolean' &&
+    Object.prototype.hasOwnProperty.call(value, 'data') &&
+    Object.prototype.hasOwnProperty.call(value, 'error')
+  );
+}
+
 function isAuthRefreshRoute(config: RetriableConfig): boolean {
   const url = config.url ?? '';
   return url === '/auth/login' || url === '/auth/refresh';
@@ -21,6 +46,31 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
     timeout: 15000,
     headers: { 'Content-Type': 'application/json' },
   });
+
+  if (__DEV__) {
+    // 개발 중 네트워크 가시성: 요청/응답/에러를 Metro 콘솔에 출력한다.
+    // eslint-disable-next-line no-console
+    console.log('[api] baseURL =', opts.baseURL);
+    client.interceptors.request.use((config) => {
+      // eslint-disable-next-line no-console
+      console.log(`[api] → ${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url ?? ''}`);
+      return config;
+    });
+    client.interceptors.response.use(
+      (resp) => {
+        // eslint-disable-next-line no-console
+        console.log(`[api] ← ${resp.status} ${resp.config.url ?? ''}`);
+        return resp;
+      },
+      (err: AxiosError) => {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[api] ✗ ${err.config?.url ?? ''} — ${err.response?.status ?? err.code ?? 'NETWORK'}: ${err.message}`,
+        );
+        throw err;
+      },
+    );
+  }
 
   client.interceptors.request.use(async (config) => {
     const cfg = config as RetriableConfig;
@@ -37,7 +87,15 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
   });
 
   client.interceptors.response.use(
-    (resp) => resp,
+    (resp) => {
+      if (isApiEnvelope(resp.data)) {
+        if (!resp.data.success) {
+          throw new Error(resp.data.error?.message ?? 'API 요청에 실패했습니다.');
+        }
+        resp.data = resp.data.data;
+      }
+      return resp;
+    },
     async (err: AxiosError) => {
       const cfg = err.config as RetriableConfig | undefined;
       if (err.response?.status === 401 && cfg && !cfg._retried && !isAuthRefreshRoute(cfg)) {
@@ -48,6 +106,10 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
           (cfg.headers as Record<string, string>).Authorization = `Bearer ${newToken}`;
           return client.request(cfg);
         }
+      }
+      const body = err.response?.data;
+      if (isApiEnvelope(body) && body.error?.message) {
+        err.message = body.error.message;
       }
       throw err;
     },

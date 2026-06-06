@@ -3,7 +3,6 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, Vie
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Crypto from 'expo-crypto';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { cameraHelper } from '@/photos/cameraHelper';
 import { photosRepo } from '@/db/photos.repo';
@@ -119,14 +118,12 @@ export function HouseInputScreen({ navigation, route }: Props) {
   const [addrOpen, setAddrOpen] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [existingPhotoIds, setExistingPhotoIds] = useState<string[]>([]);
-  const [tempHouseId] = useState(() => Crypto.randomUUID());
   const didPrefill = useRef(false);
 
   const { mutateAsync: createHouse, isPending } = useCreateHouse();
   const { mutateAsync: updateHouse, isPending: isUpdating } = useUpdateHouse();
   const { data: editingHouse } = useHouse(typeof houseId === 'string' ? houseId : undefined);
-  const workingHouseId = typeof houseId === 'string' ? houseId : tempHouseId;
+  const workingHouseId = typeof houseId === 'string' ? houseId : undefined;
   const saving = isPending || isUpdating;
 
   const set = <K extends keyof WizardForm>(key: K, value: WizardForm[K]) =>
@@ -176,7 +173,6 @@ export function HouseInputScreen({ navigation, route }: Props) {
       },
       memo: editingHouse.memo ?? '',
     });
-    setExistingPhotoIds(editingHouse.photoIds ?? []);
   }, [editingHouse]);
 
   function handleAddressPicked(base: Address) {
@@ -232,7 +228,6 @@ export function HouseInputScreen({ navigation, route }: Props) {
         if (n != null && n > 0) estimates[c] = n;
       }
     });
-    const photoIds = Array.from(new Set([...existingPhotoIds, ...photos.map((p) => p.id)]));
     return {
       address: finalAddress,
       dealType: form.dealType,
@@ -258,7 +253,6 @@ export function HouseInputScreen({ navigation, route }: Props) {
       moisture: form.cond.moisture,
       noise: form.cond.noise,
       ventilation: form.cond.ventilation,
-      photoIds,
     };
   }
 
@@ -284,12 +278,21 @@ export function HouseInputScreen({ navigation, route }: Props) {
       return;
     }
     const draft = buildDraft();
-    if (typeof houseId === 'string') {
-      await updateHouse({ id: houseId, patch: draft });
-    } else {
-      await createHouse({ id: tempHouseId, ...draft });
+    try {
+      if (typeof houseId === 'string') {
+        await updateHouse({ id: houseId, patch: draft });
+      } else {
+        const created = await createHouse(draft);
+        const localPhotoIds = photos.map((p) => p.id);
+        if (localPhotoIds.length > 0) {
+          await photosRepo.attachToHouse(localPhotoIds, created.id);
+        }
+      }
+      navigation.goBack();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      Alert.alert('저장에 실패했어요', `서버에 연결하지 못했어요.\n${message}`);
     }
-    navigation.goBack();
   }
 
   const includedCodes = form.maintenanceIncludes.map((i) => MAINTENANCE_OPTIONS[i]!.code);

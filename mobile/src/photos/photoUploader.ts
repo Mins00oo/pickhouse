@@ -5,7 +5,6 @@ export interface UploadInput {
   localUri: string;
   mimeType: string;
   houseId?: string;
-  residenceId?: string;
   photoId: string;
 }
 
@@ -18,7 +17,6 @@ export const photoUploader = {
         mimeType: input.mimeType,
         photoId: input.photoId,
         ...(input.houseId ? { houseId: input.houseId } : {}),
-        ...(input.residenceId ? { residenceId: input.residenceId } : {}),
       };
       const result = await photosApi.upload({
         ...uploadInput,

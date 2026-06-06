@@ -4,7 +4,6 @@ import { getDatabase } from './database';
 type PhotoRow = {
   id: string;
   house_id: string | null;
-  residence_id: string | null;
   local_uri: string | null;
   remote_url: string | null;
   upload_status: UploadStatus;
@@ -18,7 +17,6 @@ function rowToPhoto(r: PhotoRow): Photo {
   return {
     id: r.id,
     houseId: r.house_id ?? undefined,
-    residenceId: r.residence_id ?? undefined,
     localUri: r.local_uri ?? undefined,
     remoteUrl: r.remote_url ?? undefined,
     uploadStatus: r.upload_status,
@@ -34,13 +32,12 @@ export const photosRepo = {
     const db = await getDatabase();
     await db.runAsync(
       `INSERT INTO photos (
-        id, house_id, residence_id, local_uri, remote_url,
+        id, house_id, local_uri, remote_url,
         upload_status, taken_at, width, height, mime_type,
         is_dirty, is_deleted
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,1,0)`,
+      ) VALUES (?,?,?,?,?,?,?,?,?,1,0)`,
       p.id,
       p.houseId ?? null,
-      p.residenceId ?? null,
       p.localUri ?? null,
       p.remoteUrl ?? null,
       p.uploadStatus,
@@ -57,6 +54,17 @@ export const photosRepo = {
       "UPDATE photos SET remote_url = ?, upload_status = 'uploaded', is_dirty = 1 WHERE id = ?",
       remoteUrl,
       id,
+    );
+  },
+
+  async attachToHouse(photoIds: string[], houseId: string): Promise<void> {
+    if (photoIds.length === 0) return;
+    const db = await getDatabase();
+    const placeholders = photoIds.map(() => '?').join(',');
+    await db.runAsync(
+      `UPDATE photos SET house_id = ?, is_dirty = 1 WHERE id IN (${placeholders})`,
+      houseId,
+      ...photoIds,
     );
   },
 

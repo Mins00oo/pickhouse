@@ -21,7 +21,7 @@ async function ensureLibraryPermission(): Promise<boolean> {
 }
 
 export const cameraHelper = {
-  async takePhoto(houseId: string): Promise<CapturedPhoto | null> {
+  async takePhoto(houseId?: string): Promise<CapturedPhoto | null> {
     const ok = await ensureCameraPermission();
     if (!ok) return null;
     const result = await ImagePicker.launchCameraAsync({
@@ -46,7 +46,7 @@ export const cameraHelper = {
     return { id, localUri, mimeType, width: asset.width, height: asset.height };
   },
 
-  async pickFromLibrary(houseId: string, max = 10): Promise<CapturedPhoto[]> {
+  async pickFromLibrary(houseId?: string, max = 10): Promise<CapturedPhoto[]> {
     const ok = await ensureLibraryPermission();
     if (!ok) return [];
     const result = await ImagePicker.launchImageLibraryAsync({

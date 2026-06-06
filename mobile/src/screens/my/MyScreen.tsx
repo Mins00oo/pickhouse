@@ -5,15 +5,15 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NavigationProp } from '@react-navigation/native';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
-import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
-import { ANCHOR_META } from '@/screens/houses/anchorMeta';
+import { useMyPlaces } from '@/queries/myPlaces.queries';
+import { PLACE_META } from '@/screens/houses/placeMeta';
 import { colors } from '@/theme';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'My'>;
 
 export function MyScreen({ navigation }: Props) {
   const { data: houses = [] } = useHouses();
-  const { data: places = [] } = useAnchorPlaces();
+  const { data: places = [] } = useMyPlaces();
   const registered = places.length > 0;
 
   const rootNav = () =>
@@ -47,7 +47,7 @@ export function MyScreen({ navigation }: Props) {
           {registered ? (
             <View style={styles.commuteCard}>
               {places.map((p, i) => {
-                const meta = ANCHOR_META[p.anchorType];
+                const meta = PLACE_META[p.placeType];
                 return (
                   <Pressable
                     key={p.id}
@@ -98,7 +98,7 @@ export function MyScreen({ navigation }: Props) {
                   </Text>
                 </View>
               </View>
-              <Pressable testID="my-register-anchor" accessibilityRole="button" onPress={openPlaces} style={styles.guidanceBtn}>
+              <Pressable testID="my-register-myPlace" accessibilityRole="button" onPress={openPlaces} style={styles.guidanceBtn}>
                 <Ionicons name="add" size={16} color={colors.white} />
                 <Text style={styles.guidanceBtnText}>직장·학교 등록</Text>
               </Pressable>

@@ -4,12 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HouseStackParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
-import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
-import { useHouseCommute } from '@/queries/anchorDistances.queries';
+import { useMyPlaces } from '@/queries/myPlaces.queries';
+import { useHouseCommute } from '@/queries/myPlaceDistances.queries';
 import { House } from '@/types';
 import { colors } from '@/theme';
-import { getDisplayHouses } from '@/screens/houses/houseSampleData';
-import { formatDepositShort, pickPrimaryAnchors } from '@/screens/houses/houseMapUtils';
+import { formatDepositShort, pickPrimaryMyPlaces } from '@/screens/houses/houseMapUtils';
 import { builtYearLabel, dealTypeLabel, FACILITY_META, roomTypeLabel } from '@/domain/house';
 import { CompareTopBar } from './components/CompareTopBar';
 import { CompareHeader } from './components/CompareHeader';
@@ -26,17 +25,16 @@ type Commute = { work?: number; school?: number };
 
 export function CompareResultScreen({ route, navigation }: Props) {
   const { aId, bId } = route.params;
-  const { data = [] } = useHouses();
-  const houses = useMemo(() => getDisplayHouses(data), [data]);
+  const { data: houses = [] } = useHouses();
   const a = houses.find((h) => h.id === aId);
   const b = houses.find((h) => h.id === bId);
 
-  const { data: places = [] } = useAnchorPlaces();
-  const primaryAnchors = useMemo(() => pickPrimaryAnchors(places), [places]);
+  const { data: places = [] } = useMyPlaces();
+  const primaryMyPlaces = useMemo(() => pickPrimaryMyPlaces(places), [places]);
 
   // 두 집의 통근시간(주 통근지 기준). 등록 안 됐으면 빈 객체.
-  const commuteA = useHouseCommute(a ?? EMPTY_HOUSE, primaryAnchors);
-  const commuteB = useHouseCommute(b ?? EMPTY_HOUSE, primaryAnchors);
+  const commuteA = useHouseCommute(a ?? EMPTY_HOUSE, primaryMyPlaces);
+  const commuteB = useHouseCommute(b ?? EMPTY_HOUSE, primaryMyPlaces);
 
   const [full, setFull] = useState(false);
 
@@ -51,8 +49,8 @@ export function CompareResultScreen({ route, navigation }: Props) {
     );
   }
 
-  const hasWork = Boolean(primaryAnchors.work);
-  const hasSchool = Boolean(primaryAnchors.school);
+  const hasWork = Boolean(primaryMyPlaces.work);
+  const hasSchool = Boolean(primaryMyPlaces.school);
 
   const toggle = (
     <Pressable

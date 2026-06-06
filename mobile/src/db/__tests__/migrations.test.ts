@@ -13,34 +13,26 @@ describe('migrations', () => {
     });
   });
 
-  it('includes houses, residences, photos, sync_queue tables', () => {
+  it('includes houses, photos, sync_queue tables', () => {
     const allSql = migrations.map((m) => m.sql).join('\n');
     expect(allSql).toMatch(/CREATE TABLE.*houses/);
-    expect(allSql).toMatch(/CREATE TABLE.*residences/);
     expect(allSql).toMatch(/CREATE TABLE.*photos/);
     expect(allSql).toMatch(/CREATE TABLE.*sync_queue/);
   });
 
-  it('creates the anchor_places table with a one-per-type unique index in v3', () => {
+  it('creates the my_places table with final columns and indexes in v3', () => {
     const v3 = migrations.find((m) => m.version === 3);
     expect(v3).toBeDefined();
     const sql = v3!.sql;
-    expect(sql).toMatch(/CREATE TABLE.*anchor_places/s);
-    expect(sql).toMatch(/anchor_type TEXT NOT NULL/);
-    expect(sql).toMatch(/CREATE UNIQUE INDEX.*anchor_places\(user_id, anchor_type\)/s);
+    expect(sql).toMatch(/CREATE TABLE.*my_places/s);
+    expect(sql).toMatch(/place_type TEXT NOT NULL/);
+    expect(sql).toMatch(/transport TEXT NOT NULL/);
+    expect(sql).toMatch(/is_primary INTEGER NOT NULL DEFAULT 0/);
+    expect(sql).toMatch(/is_deleted INTEGER NOT NULL DEFAULT 0/);
+    expect(sql).toMatch(/CREATE INDEX.*idx_my_places_user.*my_places\(user_id\)/s);
+    expect(sql).toMatch(/CREATE INDEX.*idx_my_places_user_deleted.*my_places\(user_id, is_deleted\)/s);
+    expect(sql).not.toMatch(/UNIQUE INDEX/);
   });
-
-  it('relaxes anchor_places to multi-place with transport + is_primary in v4', () => {
-    const v4 = migrations.find((m) => m.version === 4);
-    expect(v4).toBeDefined();
-    const sql = v4!.sql;
-    // 이동수단 + 주 통근지 컬럼 추가
-    expect(sql).toMatch(/ALTER TABLE anchor_places ADD COLUMN transport/);
-    expect(sql).toMatch(/ALTER TABLE anchor_places ADD COLUMN is_primary/);
-    // 타입당 1개 제약 제거 → 여러 개 허용
-    expect(sql).toMatch(/DROP INDEX.*idx_anchor_user_type/s);
-  });
-
   it('adds the add-house wizard columns in migration v2', () => {
     const v2 = migrations.find((m) => m.version === 2);
     expect(v2).toBeDefined();

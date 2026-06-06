@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HouseStackParamList } from '@/navigation/types';
-import { useAnchorPlaces } from '@/queries/anchorPlaces.queries';
+import { useMyPlaces } from '@/queries/myPlaces.queries';
 import { colors } from '@/theme';
 import { PlacesHeader } from './components/PlacesHeader';
 import { PlaceCard } from './components/PlaceCard';
@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<HouseStackParamList, 'Places'>;
 
 export function PlacesListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { data: places = [] } = useAnchorPlaces();
+  const { data: places = [] } = useMyPlaces();
   const isEmpty = places.length === 0;
 
   const addPlace = () => navigation.navigate('AddPlace', undefined);

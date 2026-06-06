@@ -7,15 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { housesApi } from '@/api/houses.api';
-import { housesRepo } from '@/db/houses.repo';
-import { anchorPlacesRepo } from '@/db/anchorPlaces.repo';
+import { myPlacesRepo } from '@/db/myPlaces.repo';
 import { useAuthStore } from '@/stores/authStore';
 import type { House } from '@/types';
 import { HomeMapScreen } from '../HomeMapScreen';
 
-jest.mock('@/db/houses.repo');
 jest.mock('@/api/houses.api');
-jest.mock('@/db/anchorPlaces.repo');
+jest.mock('@/db/myPlaces.repo');
 
 let queryClient: QueryClient | null = null;
 
@@ -95,8 +93,7 @@ const nearbySecondHouse: House = {
 };
 
 function mockHouses(houses: House[]) {
-  (housesRepo.listActive as jest.Mock).mockResolvedValue(houses);
-  (housesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
+  (housesApi.list as jest.Mock).mockResolvedValue(houses);
 }
 
 function renderHome(houses: House[]) {
@@ -124,7 +121,7 @@ beforeEach(() => {
   (Location.getCurrentPositionAsync as jest.Mock).mockResolvedValue({
     coords: { latitude: 37.5563, longitude: 126.9236 },
   });
-  (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
+  (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -134,17 +131,15 @@ afterEach(() => {
 });
 
 describe('HomeMapScreen', () => {
-  it('shows sample houses on the home map when the account has no records', async () => {
-    const { findByText, findAllByText, getByPlaceholderText, getByTestId, queryByText } = renderHome([]);
+  it('shows an empty record state (no sample houses) when the account has no records', async () => {
+    const { findByText, getByPlaceholderText, getByTestId, queryByTestId } = renderHome([]);
 
     expect(getByTestId('house-map-view')).toBeTruthy();
     expect(getByPlaceholderText('장소, 지명, 집 이름 검색')).toBeTruthy();
-    // 첫 집은 카드 + 선택 콜아웃 양쪽에 이름이 뜨므로 findAll 로 ≥1 확인.
-    expect((await findAllByText('청파동 빌라')).length).toBeGreaterThan(0);
-    expect(await findByText('이 근처 내 집')).toBeTruthy();
-    expect(await findByText('7')).toBeTruthy();
-    expect(getByTestId('home-house-marker-sample-1')).toBeTruthy();
-    expect(queryByText('아직 기록한 집이 없어요')).toBeNull();
+    expect(await findByText('아직 기록한 집이 없어요')).toBeTruthy();
+    expect(await findByText('첫 집 기록하기')).toBeTruthy();
+    // 샘플 데이터가 제거됐으므로 어떤 집 마커도 그려지지 않는다.
+    expect(queryByTestId('home-house-marker-sample-1')).toBeNull();
   });
 
   it('does not mix sample houses when real records exist', async () => {
@@ -171,7 +166,10 @@ describe('HomeMapScreen', () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
     await findByText('이 근처 내 집');
+    await findByText('1,000/50');
     await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
+    // 최초 1회 현위치 자동 센터링이 끝난 뒤 mock 을 초기화한다(샘플 제거로 데이터가 비동기 로드됨).
+    await waitFor(() => expect(__naverMapMock.animateCameraTo).toHaveBeenCalled());
     __naverMapMock.animateCameraTo.mockClear();
 
     fireEvent(getByTestId('house-map-view'), 'onCameraIdle', {
@@ -229,29 +227,6 @@ describe('HomeMapScreen', () => {
     await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
     __naverMapMock.animateCameraTo.mockClear();
 
-    fireEvent.press(getByTestId('home-current-location-button'));
-
-    expect(__naverMapMock.animateCameraTo).toHaveBeenCalledWith(
-      expect.objectContaining({ latitude: 37.5563, longitude: 126.9236 }),
-    );
-  });
-
-  it('does not automatically move to current location while showing sample houses', async () => {
-    const { __naverMapMock } = jest.requireMock('@mj-studio/react-native-naver-map');
-    const { findByText } = renderHome([]);
-
-    await findByText('이 근처 내 집');
-    await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
-
-    expect(__naverMapMock.animateCameraTo).not.toHaveBeenCalled();
-  });
-
-  it('moves to current location from sample mode only when the location button is pressed', async () => {
-    const { __naverMapMock } = jest.requireMock('@mj-studio/react-native-naver-map');
-    const { findByText, getByTestId } = renderHome([]);
-
-    await findByText('이 근처 내 집');
-    await waitFor(() => expect(Location.getCurrentPositionAsync).toHaveBeenCalled());
     fireEvent.press(getByTestId('home-current-location-button'));
 
     expect(__naverMapMock.animateCameraTo).toHaveBeenCalledWith(
@@ -318,7 +293,7 @@ describe('HomeMapScreen', () => {
     __naverMapMock.coordinateToScreen.mockClear();
     const { findByText, getByTestId } = renderHome([nearbyHouse]);
 
-    await findByText('이 근처 내 집');
+    await findByText('1,000/50');
 
     expect(getByTestId('home-house-marker-near').props.latitude).toBe(37.556);
     expect(getByTestId('home-house-marker-near').props.longitude).toBe(126.901);
@@ -380,7 +355,7 @@ describe('HomeMapScreen', () => {
   it('moves the active card border when the carousel settles on another house', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('이 근처 내 집');
+    await findByText('1,000/50');
     expect(getByTestId('home-house-card-near')).toHaveStyle({ borderColor: '#0E1A14' });
     expect(getByTestId('home-house-card-outside')).toHaveStyle({ borderColor: '#EFEDE5' });
 
@@ -395,7 +370,7 @@ describe('HomeMapScreen', () => {
   it('selects the matching card when a map marker is tapped', async () => {
     const { findByText, getByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('이 근처 내 집');
+    await findByText('1,000/50');
     fireEvent.press(getByTestId('home-house-marker-outside'));
 
     expect(getByTestId('home-house-card-near')).toHaveStyle({ borderColor: '#EFEDE5' });
@@ -429,7 +404,7 @@ describe('HomeMapScreen', () => {
   it('shows the card sheet (not the full list) in map mode', async () => {
     const { findByText, getByTestId, queryByTestId } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('이 근처 내 집');
+    await findByText('1,000/50');
     // 시트 드래그/스냅 동작은 @gorhom/bottom-sheet 가 담당하므로 구조만 검증한다
     expect(getByTestId('home-result-sheet')).toBeTruthy();
     expect(getByTestId('home-house-carousel')).toBeTruthy();
@@ -438,14 +413,14 @@ describe('HomeMapScreen', () => {
   });
 
   it('shares search query between the map header and full list mode header', async () => {
-    const { findByText, getByPlaceholderText, getByText, queryByText } = renderHome([nearbyHouse, outsideHouse]);
+    const { findByText, findAllByText, getByPlaceholderText, getByText, queryByText } = renderHome([nearbyHouse, outsideHouse]);
 
-    await findByText('이 근처 내 집');
+    await findByText('1,000/50');
     fireEvent.changeText(getByPlaceholderText('장소, 지명, 집 이름 검색'), '역삼');
     fireEvent.press(getByText('목록'));
 
     expect(getByPlaceholderText('장소, 지명, 집 이름 검색').props.value).toBe('역삼');
-    expect(await findByText('역삼 오피스텔')).toBeTruthy();
+    expect((await findAllByText('역삼 오피스텔')).length).toBeGreaterThan(0);
     expect(queryByText('망원 소형집')).toBeNull();
   });
 
@@ -475,10 +450,10 @@ describe('HomeMapScreen', () => {
   });
 
   it('shows a primary commute time on house cards and hides the register banner once registered', async () => {
-    (anchorPlacesRepo.listActive as jest.Mock).mockResolvedValue([
+    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([
       {
         id: 'w1',
-        anchorType: 'WORKPLACE',
+        placeType: 'WORKPLACE',
         label: '회사',
         address: { roadAddress: '', jibunAddress: '', zonecode: '', latitude: 37.5, longitude: 127.03 },
         transport: 'TRANSIT',

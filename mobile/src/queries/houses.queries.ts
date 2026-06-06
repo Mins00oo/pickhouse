@@ -1,112 +1,112 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Crypto from 'expo-crypto';
-import { House, HouseDraft } from '@/types';
-import { housesRepo } from '@/db/houses.repo';
+import { CreateHouseRequest, House, HouseDraft, HouseRequestFields, UpdateHouseRequest } from '@/types';
 import { housesApi } from '@/api/houses.api';
-import { syncQueue } from '@/sync/syncQueue';
 import { useAuthStore } from '@/stores/authStore';
-import { lastWriteWins } from '@/sync/conflictResolution';
 
 const HOUSES_KEY = ['houses'] as const;
+
+type ClientOnlyHouseFields = {
+  id?: unknown;
+  photoIds?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+function omitUndefined<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
+}
+
+function normalizeApiInstant(value?: string): string | undefined {
+  if (!value) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return `${value}T00:00:00.000Z`;
+  }
+  return value;
+}
+
+function toHouseRequestFields(
+  input: Partial<HouseRequestFields> & ClientOnlyHouseFields,
+): UpdateHouseRequest {
+  return omitUndefined({
+    address: input.address,
+    dealType: input.dealType,
+    deposit: input.deposit,
+    rent: input.rent,
+    maintenanceFee: input.maintenanceFee,
+    area: input.area,
+    builtYear: input.builtYear,
+    floor: input.floor,
+    totalFloor: input.totalFloor,
+    availableFrom: input.availableFrom,
+    stationDistance: input.stationDistance,
+    rooms: input.rooms,
+    bathrooms: input.bathrooms,
+    hasBalcony: input.hasBalcony,
+    hasElevator: input.hasElevator,
+    hasParking: input.hasParking,
+    options: input.options,
+    security: input.security,
+    garbage: input.garbage,
+    waterPressure: input.waterPressure,
+    sunlight: input.sunlight,
+    noise: input.noise,
+    insulation: input.insulation,
+    ventilation: input.ventilation,
+    moisture: input.moisture,
+    neighborhood: input.neighborhood,
+    firstImpression: input.firstImpression,
+    memo: input.memo,
+    nickname: input.nickname,
+    visitedAt: normalizeApiInstant(input.visitedAt),
+    roomType: input.roomType,
+    floorType: input.floorType,
+    direction: input.direction,
+    maintenanceIncludes: input.maintenanceIncludes,
+    utilityEstimates: input.utilityEstimates,
+    fullOption: input.fullOption,
+    contractedAt: normalizeApiInstant(input.contractedAt),
+  });
+}
+
+function toCreateHouseRequest(draft: HouseDraft): CreateHouseRequest {
+  return {
+    ...toHouseRequestFields(draft),
+    dealType: draft.dealType,
+    deposit: draft.deposit,
+    rent: draft.dealType === 'JEONSE' ? 0 : (draft.rent ?? 0),
+  } as CreateHouseRequest;
+}
+
+function toUpdateHouseRequest(patch: Partial<House> & ClientOnlyHouseFields): UpdateHouseRequest {
+  return toHouseRequestFields(patch);
+}
 
 export function useHouses() {
   const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
     queryKey: HOUSES_KEY,
     enabled: Boolean(userId),
-    queryFn: async () => {
-      const local = userId ? await housesRepo.listActive(userId) : [];
-      try {
-        const remote = await housesApi.list();
-        return mergeHouses(local, remote);
-      } catch {
-        return local;
-      }
-    },
+    queryFn: () => housesApi.list(),
   });
-}
-
-function mergeHouses(local: House[], remote: House[]): House[] {
-  const byId = new Map<string, House>();
-  for (const h of remote) byId.set(h.id, h);
-  for (const h of local) {
-    const r = byId.get(h.id);
-    byId.set(h.id, lastWriteWins(h, r ?? null));
-  }
-  return Array.from(byId.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function useHouse(id: string | undefined) {
   return useQuery({
     queryKey: ['house', id],
     enabled: Boolean(id),
-    queryFn: async () => {
+    queryFn: () => {
       if (!id) throw new Error('missing id');
-      const local = await housesRepo.findById(id);
-      try {
-        const remote = await housesApi.get(id);
-        return lastWriteWins(local ?? remote, remote);
-      } catch {
-        if (!local) throw new Error('not found');
-        return local;
-      }
+      return housesApi.get(id);
     },
   });
 }
 
 export function useCreateHouse() {
   const qc = useQueryClient();
-  const userId = useAuthStore((s) => s.user?.id) ?? 'unknown';
   return useMutation({
-    mutationFn: async (draft: HouseDraft) => {
-      const now = new Date().toISOString();
-      const house: House = {
-        id: draft.id ?? Crypto.randomUUID(),
-        address: draft.address,
-        dealType: draft.dealType,
-        deposit: draft.deposit,
-        rent: draft.rent,
-        maintenanceFee: draft.maintenanceFee,
-        area: draft.area,
-        builtYear: draft.builtYear,
-        floor: draft.floor,
-        totalFloor: draft.totalFloor,
-        availableFrom: draft.availableFrom,
-        stationDistance: draft.stationDistance,
-        rooms: draft.rooms,
-        bathrooms: draft.bathrooms,
-        hasBalcony: draft.hasBalcony,
-        hasElevator: draft.hasElevator,
-        hasParking: draft.hasParking,
-        options: draft.options,
-        security: draft.security,
-        garbage: draft.garbage,
-        waterPressure: draft.waterPressure,
-        sunlight: draft.sunlight,
-        noise: draft.noise,
-        insulation: draft.insulation,
-        ventilation: draft.ventilation,
-        moisture: draft.moisture,
-        neighborhood: draft.neighborhood,
-        firstImpression: draft.firstImpression,
-        memo: draft.memo,
-        nickname: draft.nickname,
-        visitedAt: draft.visitedAt,
-        roomType: draft.roomType,
-        floorType: draft.floorType,
-        direction: draft.direction,
-        maintenanceIncludes: draft.maintenanceIncludes,
-        utilityEstimates: draft.utilityEstimates,
-        fullOption: draft.fullOption,
-        photoIds: draft.photoIds ?? [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      await housesRepo.insert(house, userId);
-      await syncQueue.queueHouseCreate(house);
-      return house;
-    },
-    onSuccess: () => {
+    mutationFn: async (draft: HouseDraft) => housesApi.create(toCreateHouseRequest(draft)),
+    onSuccess: (created) => {
+      qc.setQueryData(['house', created.id], created);
       qc.invalidateQueries({ queryKey: HOUSES_KEY });
     },
   });
@@ -115,21 +115,12 @@ export function useCreateHouse() {
 export function useUpdateHouse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<House> }) => {
-      const existing = await housesRepo.findById(id);
-      if (!existing) throw new Error('house not found locally');
-      const updated: House = {
-        ...existing,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      await housesRepo.update(updated);
-      await syncQueue.queueHouseUpdate(id, patch);
-      return updated;
-    },
-    onSuccess: (h) => {
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<House> & ClientOnlyHouseFields }) =>
+      housesApi.update(id, toUpdateHouseRequest(patch)),
+    onSuccess: (updated) => {
+      qc.setQueryData(['house', updated.id], updated);
       qc.invalidateQueries({ queryKey: HOUSES_KEY });
-      qc.invalidateQueries({ queryKey: ['house', h.id] });
+      qc.invalidateQueries({ queryKey: ['house', updated.id] });
     },
   });
 }
@@ -137,10 +128,7 @@ export function useUpdateHouse() {
 export function useDeleteHouse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      await housesRepo.softDelete(id);
-      await syncQueue.queueHouseDelete(id);
-    },
+    mutationFn: (id: string) => housesApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: HOUSES_KEY }),
   });
 }

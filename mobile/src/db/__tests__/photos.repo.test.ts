@@ -42,4 +42,14 @@ describe('photosRepo', () => {
     const sql = mockGetAllAsync.mock.calls[0]![0];
     expect(sql).toMatch(/upload_status = 'pending'/);
   });
+
+  it('attachToHouse links local photos to the server-created house id', async () => {
+    await photosRepo.attachToHouse(['p1', 'p2'], 'h1');
+    const [sql, houseId, firstPhotoId, secondPhotoId] = mockRunAsync.mock.calls[0]!;
+    expect(sql).toMatch(/UPDATE photos SET house_id = \?/);
+    expect(sql).toMatch(/WHERE id IN \(\?,\?\)/);
+    expect(houseId).toBe('h1');
+    expect(firstPhotoId).toBe('p1');
+    expect(secondPhotoId).toBe('p2');
+  });
 });
