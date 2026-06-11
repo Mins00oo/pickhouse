@@ -1,6 +1,9 @@
 package app.homes.global.security;
 
+import app.homes.global.exception.ErrorCode;
+import app.homes.user.repository.UserRepository;
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.exceptions.TokenExpiredException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +28,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final String PREFIX = "Bearer ";
 
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -34,10 +38,32 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = header.substring(PREFIX.length());
             try {
                 String userId = jwtProvider.verifyAndGetUserId(token);
+                boolean active = userRepository.findById(userId)
+                        .map(user -> user.isActive())
+                        .orElse(false);
+                if (!active) {
+                    request.setAttribute(
+                            JwtAuthenticationEntryPoint.ERROR_CODE_ATTRIBUTE,
+                            ErrorCode.AUTH_INVALID_TOKEN
+                    );
+                    SecurityContextHolder.clearContext();
+                    chain.doFilter(request, response);
+                    return;
+                }
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (TokenExpiredException e) {
+                request.setAttribute(
+                        JwtAuthenticationEntryPoint.ERROR_CODE_ATTRIBUTE,
+                        ErrorCode.AUTH_EXPIRED
+                );
+                SecurityContextHolder.clearContext();
             } catch (JWTVerificationException e) {
+                request.setAttribute(
+                        JwtAuthenticationEntryPoint.ERROR_CODE_ATTRIBUTE,
+                        ErrorCode.AUTH_INVALID_TOKEN
+                );
                 SecurityContextHolder.clearContext();
             }
         }

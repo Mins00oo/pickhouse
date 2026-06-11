@@ -37,4 +37,16 @@ public class SocialAccount extends BaseTimeEntity {
 
     @Column(name = "provider_user_id", length = 255, nullable = false)
     private String providerUserId;
+
+    public static SocialAccount create(String userId, String provider, String providerUserId) {
+        SocialAccount account = new SocialAccount();
+        account.userId = userId;
+        account.provider = provider;
+        account.providerUserId = providerUserId;
+        return account;
+    }
+
+    public void reassignTo(String newUserId) {
+        this.userId = newUserId;
+    }
 }

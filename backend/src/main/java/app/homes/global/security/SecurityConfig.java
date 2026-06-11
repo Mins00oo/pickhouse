@@ -1,5 +1,6 @@
 package app.homes.global.security;
 
+import app.homes.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,9 +19,10 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final JwtAccessDeniedHandler accessDeniedHandler;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final UserRepository userRepository;
 
     private static final String[] PUBLIC_PATHS = {
-            "/auth/login", "/auth/refresh",
+            "/auth/login", "/auth/refresh", "/auth/logout",
             "/actuator/health",
             "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**"
     };
@@ -39,7 +41,10 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                .addFilterBefore(new JwtAuthFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        new JwtAuthFilter(jwtProvider, userRepository),
+                        UsernamePasswordAuthenticationFilter.class
+                );
         return http.build();
     }
 }

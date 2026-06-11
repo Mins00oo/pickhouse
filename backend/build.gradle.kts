@@ -32,6 +32,7 @@ dependencies {
 
     // JWT (HS256, self-issued tokens)
     implementation("com.auth0:java-jwt:4.4.0")
+    implementation("com.auth0:jwks-rsa:0.24.1")
 
     // SQL logging (separate SQL log file via p6spy)
     implementation("com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.10.0")

@@ -20,12 +20,18 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
+    public static final String ERROR_CODE_ATTRIBUTE =
+            JwtAuthenticationEntryPoint.class.getName() + ".ERROR_CODE";
+
     private final ObjectMapper objectMapper;
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
-        ErrorCode ec = ErrorCode.AUTH_REQUIRED;
+        Object attribute = request.getAttribute(ERROR_CODE_ATTRIBUTE);
+        ErrorCode ec = attribute instanceof ErrorCode errorCode
+                ? errorCode
+                : ErrorCode.AUTH_REQUIRED;
         response.setStatus(ec.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
