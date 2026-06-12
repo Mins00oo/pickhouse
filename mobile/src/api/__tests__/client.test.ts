@@ -1,4 +1,4 @@
-import { createApiClient } from '../client';
+import { ApiError, createApiClient } from '../client';
 
 describe('apiClient', () => {
   it('adds Bearer header when token provided', async () => {
@@ -14,19 +14,21 @@ describe('apiClient', () => {
       config: {},
     });
     client.defaults.adapter = adapter;
-    await client.get('/me');
+
+    await client.get('/users/me');
+
     const cfg = adapter.mock.calls[0]![0];
     expect(cfg.headers.Authorization).toBe('Bearer abc');
   });
 
-  it('unwraps unified successful responses to response.data', async () => {
+  it('unwraps successful responses to response.data', async () => {
     const client = createApiClient({
       baseURL: 'http://test',
       getAccessToken: async () => null,
       onUnauthorized: async () => null,
     });
     client.defaults.adapter = jest.fn().mockResolvedValue({
-      data: { success: true, data: { id: 'h1' }, error: null },
+      data: { code: 'SUCCESS', message: 'OK', data: { id: 'h1' } },
       status: 200,
       headers: {},
       config: {},
@@ -37,7 +39,7 @@ describe('apiClient', () => {
     expect(res.data).toEqual({ id: 'h1' });
   });
 
-  it('uses unified error message when the server returns an error envelope', async () => {
+  it('uses the server message from an error envelope', async () => {
     const client = createApiClient({
       baseURL: 'http://test',
       getAccessToken: async () => null,
@@ -47,9 +49,9 @@ describe('apiClient', () => {
     err.response = {
       status: 404,
       data: {
-        success: false,
+        code: 'HOUSE_NOT_FOUND',
+        message: 'House not found.',
         data: null,
-        error: { code: 'HOUSE_NOT_FOUND', message: '집 정보를 찾을 수 없습니다.', details: {} },
       },
       headers: {},
       config: {},
@@ -57,7 +59,7 @@ describe('apiClient', () => {
     err.config = {};
     client.defaults.adapter = jest.fn().mockRejectedValue(err);
 
-    await expect(client.get('/houses/missing')).rejects.toThrow('집 정보를 찾을 수 없습니다.');
+    await expect(client.get('/houses/missing')).rejects.toThrow('House not found.');
   });
 
   it('on 401 calls onUnauthorized and retries with new token', async () => {
@@ -79,13 +81,15 @@ describe('apiClient', () => {
       return Promise.resolve({ data: { ok: true }, status: 200, headers: {}, config: cfg });
     });
     client.defaults.adapter = adapter;
-    const res = await client.get('/me');
+
+    const res = await client.get('/users/me');
+
     expect(res.data).toEqual({ ok: true });
     expect(onUnauthorized).toHaveBeenCalled();
     expect(adapter.mock.calls[1]![0].headers.Authorization).toBe('Bearer newtoken');
   });
 
-  it('does not refresh when /auth/login returns 401', async () => {
+  it('does not refresh when a public login request returns 401', async () => {
     const onUnauthorized = jest.fn().mockResolvedValue('newtoken');
     const client = createApiClient({
       baseURL: 'http://test',
@@ -94,19 +98,35 @@ describe('apiClient', () => {
     });
     const adapter = jest.fn().mockImplementation((cfg) => {
       const err: any = new Error('401');
-      err.response = { status: 401, data: {}, headers: {}, config: cfg };
+      err.response = {
+        status: 401,
+        data: { code: 'INVALID_ID_TOKEN', message: 'Invalid token.', data: null },
+        headers: {},
+        config: cfg,
+      };
       err.config = cfg;
       return Promise.reject(err);
     });
     client.defaults.adapter = adapter;
 
-    await expect(client.post('/auth/login', { provider: 'kakao', idToken: 'id' })).rejects.toThrow('401');
+    await expect(
+      client.post(
+        '/auth/login',
+        {
+          provider: 'KAKAO',
+          idToken: 'id',
+          deviceId: 'device-id',
+          displayName: null,
+        },
+        { skipAuth: true },
+      ),
+    ).rejects.toBeInstanceOf(ApiError);
 
     expect(onUnauthorized).not.toHaveBeenCalled();
     expect(adapter).toHaveBeenCalledTimes(1);
   });
 
-  it('does not refresh when /auth/refresh returns 401', async () => {
+  it('does not refresh when a public refresh request returns 401', async () => {
     const onUnauthorized = jest.fn().mockResolvedValue('newtoken');
     const client = createApiClient({
       baseURL: 'http://test',
@@ -115,13 +135,24 @@ describe('apiClient', () => {
     });
     const adapter = jest.fn().mockImplementation((cfg) => {
       const err: any = new Error('401');
-      err.response = { status: 401, data: {}, headers: {}, config: cfg };
+      err.response = {
+        status: 401,
+        data: { code: 'REFRESH_TOKEN_INVALID', message: 'Invalid refresh token.', data: null },
+        headers: {},
+        config: cfg,
+      };
       err.config = cfg;
       return Promise.reject(err);
     });
     client.defaults.adapter = adapter;
 
-    await expect(client.post('/auth/refresh', { refreshToken: 'r' })).rejects.toThrow('401');
+    await expect(
+      client.post(
+        '/auth/refresh',
+        { refreshToken: 'r', deviceId: 'device-id' },
+        { skipAuth: true },
+      ),
+    ).rejects.toBeInstanceOf(ApiError);
 
     expect(onUnauthorized).not.toHaveBeenCalled();
     expect(adapter).toHaveBeenCalledTimes(1);

@@ -72,7 +72,13 @@ describe('AuthScreen', () => {
   it('shows a backend message when Kakao login fails for another reason', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     (authService.loginWithKakao as jest.Mock).mockRejectedValueOnce({
-      response: { data: { error: { message: 'Kakao ID token invalid' } } },
+      response: {
+        data: {
+          code: 'INVALID_ID_TOKEN',
+          message: 'Kakao ID token invalid',
+          data: null,
+        },
+      },
       message: 'Request failed with status code 401',
     });
     const { getByTestId } = render(<AuthScreen />);

@@ -8,8 +8,11 @@ describe('kakaoAuth', () => {
       idToken: 'kakao-id-token-xyz',
       refreshToken: 'kakao-refresh',
     });
-    const token = await kakaoAuth.signIn();
-    expect(token).toBe('kakao-id-token-xyz');
+    const credential = await kakaoAuth.signIn();
+    expect(credential).toEqual({
+      idToken: 'kakao-id-token-xyz',
+      displayName: null,
+    });
   });
 
   it('throws when idToken is missing', async () => {

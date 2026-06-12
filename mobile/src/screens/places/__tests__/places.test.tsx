@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { myPlacesRepo } from '@/db/myPlaces.repo';
 import { myPlacesApi } from '@/api/myPlaces.api';
 import { housesApi } from '@/api/houses.api';
 import { useAuthStore } from '@/stores/authStore';
@@ -10,7 +9,6 @@ import type { MyPlace } from '@/types';
 import { MyScreen } from '@/screens/my/MyScreen';
 import { PlacesListScreen } from '../PlacesListScreen';
 
-jest.mock('@/db/myPlaces.repo');
 jest.mock('@/api/myPlaces.api');
 jest.mock('@/api/houses.api');
 
@@ -41,14 +39,12 @@ const workplace: MyPlace = {
 beforeEach(() => {
   jest.clearAllMocks();
   useAuthStore.setState({
-    user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
     refreshToken: 'r',
     status: 'authenticated',
   });
   (housesApi.list as jest.Mock).mockResolvedValue([]);
-  (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
-  (myPlacesApi.list as jest.Mock).mockRejectedValue(new Error('offline'));
+  (myPlacesApi.list as jest.Mock).mockResolvedValue([]);
 });
 
 describe('MyScreen', () => {
@@ -63,7 +59,7 @@ describe('MyScreen', () => {
   });
 
   it('lists registered places with the 주 통근지 badge', async () => {
-    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplace]);
+    (myPlacesApi.list as jest.Mock).mockResolvedValue([workplace]);
     const nav = { navigate: jest.fn(), getParent: () => ({ navigate: jest.fn() }) } as any;
     const { findByText, getByTestId } = render(wrap(<MyScreen navigation={nav} route={{} as any} />));
 
@@ -84,7 +80,7 @@ describe('PlacesListScreen', () => {
   });
 
   it('lists registered places and opens edit for a card', async () => {
-    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([workplace]);
+    (myPlacesApi.list as jest.Mock).mockResolvedValue([workplace]);
     const nav = { navigate: jest.fn(), goBack: jest.fn() } as any;
     const { findByText, getByTestId } = render(wrap(<PlacesListScreen navigation={nav} route={{} as any} />));
 

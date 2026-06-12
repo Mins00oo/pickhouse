@@ -24,7 +24,6 @@ const wrapper = ({ children }: { children: ReactNode }) => {
 beforeEach(() => {
   jest.clearAllMocks();
   useAuthStore.setState({
-    user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
     refreshToken: 'r',
     status: 'authenticated',

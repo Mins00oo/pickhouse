@@ -82,10 +82,10 @@ function toUpdateHouseRequest(patch: Partial<House> & ClientOnlyHouseFields): Up
 }
 
 export function useHouses() {
-  const userId = useAuthStore((s) => s.user?.id);
+  const authenticated = useAuthStore((s) => s.status === 'authenticated');
   return useQuery({
     queryKey: HOUSES_KEY,
-    enabled: Boolean(userId),
+    enabled: authenticated,
     queryFn: () => housesApi.list(),
   });
 }

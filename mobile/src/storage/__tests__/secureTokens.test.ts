@@ -6,52 +6,28 @@ describe('secureTokens', () => {
     jest.clearAllMocks();
   });
 
-  it('saveTokens writes access + refresh under expected keys', async () => {
+  it('saves and loads the token pair', async () => {
     await secureTokens.save({ accessToken: 'a', refreshToken: 'r' });
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith('ph_access_token', 'a');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith('ph_refresh_token', 'r');
-  });
 
-  it('save writes a user snapshot when provided', async () => {
-    const user = { id: 'u1', email: 'u@example.com', authProviders: {}, createdAt: '' };
-
-    await secureTokens.save({ accessToken: 'a', refreshToken: 'r', user });
-
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('ph_user', JSON.stringify(user));
-  });
-
-  it('load returns tokens and user snapshot when present', async () => {
     (SecureStore.getItemAsync as jest.Mock)
       .mockResolvedValueOnce('a')
-      .mockResolvedValueOnce('r')
-      .mockResolvedValueOnce(JSON.stringify({
-        id: 'u1',
-        email: 'u@example.com',
-        authProviders: {},
-        createdAt: '',
-      }));
-    const t = await secureTokens.load();
-    expect(t).toEqual({
+      .mockResolvedValueOnce('r');
+    await expect(secureTokens.load()).resolves.toEqual({
       accessToken: 'a',
       refreshToken: 'r',
-      user: {
-        id: 'u1',
-        email: 'u@example.com',
-        authProviders: {},
-        createdAt: '',
-      },
     });
   });
 
-  it('load returns null when access is missing', async () => {
+  it('returns null when either token is missing', async () => {
     (SecureStore.getItemAsync as jest.Mock)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce('r');
-    const t = await secureTokens.load();
-    expect(t).toBeNull();
+    await expect(secureTokens.load()).resolves.toBeNull();
   });
 
-  it('clear deletes both keys', async () => {
+  it('clears token keys and the legacy user key', async () => {
     await secureTokens.clear();
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('ph_access_token');
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('ph_refresh_token');

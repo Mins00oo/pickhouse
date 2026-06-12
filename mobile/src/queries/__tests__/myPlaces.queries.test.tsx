@@ -1,72 +1,69 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
-import { useSavePlace, useRemovePlace } from '../myPlaces.queries';
-import { myPlacesRepo } from '@/db/myPlaces.repo';
-import { syncQueue } from '@/sync/syncQueue';
+import { myPlacesApi } from '@/api/myPlaces.api';
 import { useAuthStore } from '@/stores/authStore';
+import { useMyPlaces, useRemovePlace, useSavePlace } from '../myPlaces.queries';
 
-jest.mock('@/db/myPlaces.repo');
 jest.mock('@/api/myPlaces.api');
-jest.mock('@/sync/syncQueue');
+jest.mock('expo-crypto', () => ({ randomUUID: () => 'place-1' }));
 
 let queryClient: QueryClient | null = null;
+
 const wrapper = ({ children }: { children: ReactNode }) => {
   queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
   });
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 };
 
-const addr = { roadAddress: '서울 강남구 강남대로 396', jibunAddress: '역삼동', zonecode: '', latitude: 37.5, longitude: 127.0 };
+const address = {
+  roadAddress: '서울 강남구 강남대로 396',
+  jibunAddress: '역삼동',
+  zonecode: '',
+  latitude: 37.5,
+  longitude: 127,
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
   useAuthStore.setState({
-    user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
     refreshToken: 'r',
     status: 'authenticated',
   });
 });
+
 afterEach(() => {
   queryClient?.clear();
   queryClient = null;
 });
 
-describe('useSavePlace', () => {
-  it('upserts the place and clears sibling primaries when set as 주 통근지', async () => {
-    const { result } = renderHook(() => useSavePlace(), { wrapper });
-    const saved = await result.current.mutateAsync({
-      placeType: 'WORKPLACE',
-      address: addr,
-      transport: 'TRANSIT',
-      isPrimary: true,
-      label: '판교 회사',
-    });
-    expect(myPlacesRepo.upsert).toHaveBeenCalledTimes(1);
-    expect(myPlacesRepo.clearPrimaryExcept).toHaveBeenCalledWith('u1', 'WORKPLACE', saved.id);
-    expect(syncQueue.queueMyPlaceCreate).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT clear siblings when not primary', async () => {
-    const { result } = renderHook(() => useSavePlace(), { wrapper });
-    await result.current.mutateAsync({
-      placeType: 'OTHER',
-      address: addr,
-      transport: 'WALK',
-      isPrimary: false,
-    });
-    expect(myPlacesRepo.upsert).toHaveBeenCalledTimes(1);
-    expect(myPlacesRepo.clearPrimaryExcept).not.toHaveBeenCalled();
-  });
+it('loads places directly from the backend', async () => {
+  (myPlacesApi.list as jest.Mock).mockResolvedValueOnce([]);
+  const { result } = renderHook(() => useMyPlaces(), { wrapper });
+  await waitFor(() => expect(result.current.data).toEqual([]));
 });
 
-describe('useRemovePlace', () => {
-  it('soft-deletes a place by id and enqueues a sync delete', async () => {
-    const { result } = renderHook(() => useRemovePlace(), { wrapper });
-    await result.current.mutateAsync('a1');
-    await waitFor(() => expect(myPlacesRepo.softDelete).toHaveBeenCalledWith('a1'));
-    expect(syncQueue.queueMyPlaceDelete).toHaveBeenCalledWith('a1');
+it('creates and removes places directly through the backend API', async () => {
+  (myPlacesApi.create as jest.Mock).mockImplementation((place) => Promise.resolve(place));
+  (myPlacesApi.remove as jest.Mock).mockResolvedValue(undefined);
+  const save = renderHook(() => useSavePlace(), { wrapper });
+  await save.result.current.mutateAsync({
+    placeType: 'WORKPLACE',
+    address,
+    transport: 'TRANSIT',
+    isPrimary: true,
+    label: '판교 회사',
   });
+  expect(myPlacesApi.create).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 'place-1', label: '판교 회사' }),
+  );
+
+  const remove = renderHook(() => useRemovePlace(), { wrapper });
+  await remove.result.current.mutateAsync('place-1');
+  expect(myPlacesApi.remove).toHaveBeenCalledWith('place-1');
 });

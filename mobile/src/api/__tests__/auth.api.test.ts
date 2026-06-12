@@ -1,53 +1,68 @@
+import axios from 'axios';
 import { authApi } from '../auth.api';
 import { setApiClient } from '../client';
-import axios from 'axios';
 
 describe('authApi', () => {
-  it('login POSTs provider + idToken to /auth/login', async () => {
+  it('login posts the new device-aware request', async () => {
     const client = axios.create({ baseURL: 'http://test' });
     const adapter = jest.fn().mockResolvedValue({
-      data: { accessToken: 'a', refreshToken: 'r', user: { id: 'u1', authProviders: {}, createdAt: '' } },
-      status: 200, headers: {}, config: {},
+      data: { accessToken: 'a', refreshToken: 'r' },
+      status: 200,
+      headers: {},
+      config: {},
     });
     client.defaults.adapter = adapter;
     setApiClient(client);
-    const res = await authApi.login({ provider: 'apple', idToken: 'token123' });
-    expect(adapter).toHaveBeenCalled();
+
+    await authApi.login({
+      provider: 'APPLE',
+      idToken: 'token123',
+      deviceId: 'device-1',
+      displayName: null,
+    });
+
     const cfg = adapter.mock.calls[0]![0];
     expect(cfg.url).toBe('/auth/login');
-    expect(JSON.parse(cfg.data)).toEqual({ provider: 'apple', idToken: 'token123' });
-    expect(res.accessToken).toBe('a');
+    expect(JSON.parse(cfg.data)).toEqual({
+      provider: 'APPLE',
+      idToken: 'token123',
+      deviceId: 'device-1',
+      displayName: null,
+    });
   });
 
-  it('refresh POSTs refreshToken to /auth/refresh', async () => {
+  it('refresh posts refreshToken and deviceId', async () => {
     const client = axios.create({ baseURL: 'http://test' });
     const adapter = jest.fn().mockResolvedValue({
       data: { accessToken: 'newA', refreshToken: 'newR' },
-      status: 200, headers: {}, config: {},
+      status: 200,
+      headers: {},
+      config: {},
     });
     client.defaults.adapter = adapter;
     setApiClient(client);
-    const res = await authApi.refresh('oldR');
+
+    await authApi.refresh({ refreshToken: 'oldR', deviceId: 'device-1' });
+
     const cfg = adapter.mock.calls[0]![0];
     expect(cfg.url).toBe('/auth/refresh');
-    expect(JSON.parse(cfg.data)).toEqual({ refreshToken: 'oldR' });
-    expect(res.accessToken).toBe('newA');
+    expect(JSON.parse(cfg.data)).toEqual({ refreshToken: 'oldR', deviceId: 'device-1' });
   });
 
-  it('me GETs /me for session restoration', async () => {
+  it('uses /users/me for profile requests', async () => {
     const client = axios.create({ baseURL: 'http://test' });
     const adapter = jest.fn().mockResolvedValue({
-      data: { id: 'u1', email: 'me@example.com', nickname: 'picker', createdAt: '2026-01-01T00:00:00Z' },
-      status: 200, headers: {}, config: {},
+      data: { nickname: 'picker', createdAt: '2026-01-01T00:00:00' },
+      status: 200,
+      headers: {},
+      config: {},
     });
     client.defaults.adapter = adapter;
     setApiClient(client);
 
-    const res = await authApi.me();
+    const profile = await authApi.me();
 
-    const cfg = adapter.mock.calls[0]![0];
-    expect(cfg.url).toBe('/me');
-    expect(res.id).toBe('u1');
-    expect(res.nickname).toBe('picker');
+    expect(adapter.mock.calls[0]![0].url).toBe('/users/me');
+    expect(profile.nickname).toBe('picker');
   });
 });

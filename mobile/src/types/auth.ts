@@ -1,19 +1,28 @@
-import { User } from './user';
-
-export type AuthProvider = 'apple' | 'kakao';
+export type AuthProvider = 'APPLE' | 'KAKAO';
 
 export interface LoginRequest {
   provider: AuthProvider;
   idToken: string;
+  deviceId: string;
+  displayName: string | null;
 }
 
-export interface LoginResponse {
+export interface TokenPair {
   accessToken: string;
   refreshToken: string;
-  user: User;
 }
 
-export interface RefreshResponse {
-  accessToken: string;
+export type LoginResponse = TokenPair;
+export type RefreshResponse = TokenPair;
+
+export interface RefreshRequest {
   refreshToken: string;
+  deviceId: string;
+}
+
+export type LogoutRequest = RefreshRequest;
+
+export interface SocialLoginCredential {
+  idToken: string;
+  displayName: string | null;
 }

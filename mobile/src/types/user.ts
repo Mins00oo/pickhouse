@@ -1,10 +1,4 @@
-export interface User {
-  id: string;
-  email?: string;
-  nickname?: string;
-  authProviders?: {
-    apple?: string;
-    kakao?: string;
-  };
+export interface UserProfile {
+  nickname: string | null;
   createdAt: string;
 }

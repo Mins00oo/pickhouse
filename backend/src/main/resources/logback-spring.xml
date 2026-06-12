@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="LOG_DIR" value="logs"/>
+    <property name="WEB_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="SQL_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${WEB_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 웹/애플리케이션 로그: 일 단위 롤링, 30일 보관 후 자동 삭제 -->
+    <appender name="WEB_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/web/log-homes-web.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/web/log-homes-web.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${WEB_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- SQL 로그: 일 단위 롤링, 30일 보관 -->
+    <appender name="SQL_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/sql/log-homes-db.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/sql/log-homes-db.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${SQL_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- p6spy가 찍는 SQL은 SQL 파일로만 (웹 로그와 분리) -->
+    <logger name="p6spy" level="INFO" additivity="false">
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+
+    <!-- 운영: 파일만 -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="WEB_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- 그 외(local 등): 콘솔 + 파일 -->
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="WEB_FILE"/>
+        </root>
+    </springProfile>
+
+</configuration>

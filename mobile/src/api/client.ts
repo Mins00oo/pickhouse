@@ -1,5 +1,16 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    skipAuth?: boolean;
+  }
+
+  interface InternalAxiosRequestConfig {
+    skipAuth?: boolean;
+    _retried?: boolean;
+  }
+}
+
 export interface ApiClientOptions {
   baseURL: string;
   getAccessToken: () => Promise<string | null>;
@@ -8,18 +19,25 @@ export interface ApiClientOptions {
 
 interface RetriableConfig extends InternalAxiosRequestConfig {
   _retried?: boolean;
-}
-
-interface ApiErrorPayload {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
+  skipAuth?: boolean;
 }
 
 interface ApiEnvelope<T> {
-  success: boolean;
-  data: T | null;
-  error: ApiErrorPayload | null;
+  code: string;
+  message: string;
+  data: T;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly status: number | null,
+    public readonly data: unknown = null,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,15 +47,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
   return (
     isRecord(value) &&
-    typeof value.success === 'boolean' &&
-    Object.prototype.hasOwnProperty.call(value, 'data') &&
-    Object.prototype.hasOwnProperty.call(value, 'error')
+    typeof value.code === 'string' &&
+    typeof value.message === 'string' &&
+    Object.prototype.hasOwnProperty.call(value, 'data')
   );
 }
 
-function isAuthRefreshRoute(config: RetriableConfig): boolean {
-  const url = config.url ?? '';
-  return url === '/auth/login' || url === '/auth/refresh';
+function toApiError(error: AxiosError): Error {
+  const body = error.response?.data;
+  if (isApiEnvelope(body)) {
+    return new ApiError(body.code, body.message, error.response?.status ?? null, body.data);
+  }
+  return error;
 }
 
 export function createApiClient(opts: ApiClientOptions): AxiosInstance {
@@ -74,6 +95,7 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
 
   client.interceptors.request.use(async (config) => {
     const cfg = config as RetriableConfig;
+    if (cfg.skipAuth) return config;
     // Skip token injection on retry — token already set by response interceptor
     if (cfg._retried) {
       return config;
@@ -89,16 +111,13 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
   client.interceptors.response.use(
     (resp) => {
       if (isApiEnvelope(resp.data)) {
-        if (!resp.data.success) {
-          throw new Error(resp.data.error?.message ?? 'API 요청에 실패했습니다.');
-        }
         resp.data = resp.data.data;
       }
       return resp;
     },
     async (err: AxiosError) => {
       const cfg = err.config as RetriableConfig | undefined;
-      if (err.response?.status === 401 && cfg && !cfg._retried && !isAuthRefreshRoute(cfg)) {
+      if (err.response?.status === 401 && cfg && !cfg._retried && !cfg.skipAuth) {
         cfg._retried = true;
         const newToken = await opts.onUnauthorized();
         if (newToken) {
@@ -107,11 +126,7 @@ export function createApiClient(opts: ApiClientOptions): AxiosInstance {
           return client.request(cfg);
         }
       }
-      const body = err.response?.data;
-      if (isApiEnvelope(body) && body.error?.message) {
-        err.message = body.error.message;
-      }
-      throw err;
+      throw toApiError(err);
     },
   );
 

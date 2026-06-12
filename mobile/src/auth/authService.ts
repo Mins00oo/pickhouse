@@ -1,77 +1,81 @@
 import { authApi } from '@/api/auth.api';
+import { ApiError } from '@/api/client';
+import { queryClient } from '@/queries/queryClient';
+import { deviceId } from '@/storage/deviceId';
 import { secureTokens } from '@/storage/secureTokens';
 import { useAuthStore } from '@/stores/authStore';
-import { AuthProvider } from '@/types';
+import { AuthProvider, SocialLoginCredential } from '@/types';
 import { appleAuth } from './appleAuth';
 import { kakaoAuth } from './kakaoAuth';
 
 let refreshPromise: Promise<string | null> | null = null;
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
-}
-
 function responseStatus(error: unknown): number | null {
-  const response = asRecord(error)?.response;
-  const status = asRecord(response)?.status;
-  return typeof status === 'number' ? status : null;
-}
-
-function isUnauthorized(error: unknown): boolean {
-  return responseStatus(error) === 401;
+  if (error instanceof ApiError) return error.status;
+  if (error !== null && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { status?: unknown } }).response;
+    return typeof response?.status === 'number' ? response.status : null;
+  }
+  return null;
 }
 
 async function clearStoredSession(): Promise<void> {
   await secureTokens.clear();
   useAuthStore.getState().clear();
+  queryClient.clear();
 }
 
-async function loginWith(provider: AuthProvider, idToken: string): Promise<void> {
-  const res = await authApi.login({ provider, idToken });
-  await secureTokens.save({
-    accessToken: res.accessToken,
-    refreshToken: res.refreshToken,
-    user: res.user,
+async function signOutFromSocialProvider(): Promise<void> {
+  try {
+    await kakaoAuth.signOut();
+  } catch {
+    // The backend and local sessions are already closed.
+  }
+}
+
+async function loginWith(
+  provider: AuthProvider,
+  credential: SocialLoginCredential,
+): Promise<void> {
+  const tokens = await authApi.login({
+    provider,
+    idToken: credential.idToken,
+    deviceId: await deviceId.get(),
+    displayName: credential.displayName,
   });
-  useAuthStore.getState().setSession({
-    user: res.user,
-    accessToken: res.accessToken,
-    refreshToken: res.refreshToken,
-  });
+  await secureTokens.save(tokens);
+  useAuthStore.getState().setSession(tokens);
 }
 
 async function performRefreshAccessToken(): Promise<string | null> {
-  const current = useAuthStore.getState().refreshToken;
-  if (!current) return null;
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) return null;
+
   try {
-    const res = await authApi.refresh(current);
-    useAuthStore.getState().updateTokens({
-      accessToken: res.accessToken,
-      refreshToken: res.refreshToken,
+    const tokens = await authApi.refresh({
+      refreshToken,
+      deviceId: await deviceId.get(),
     });
-    await secureTokens.save({
-      accessToken: res.accessToken,
-      refreshToken: res.refreshToken,
-    });
-    return res.accessToken;
-  } catch (e) {
-    if (isUnauthorized(e)) {
+    useAuthStore.getState().updateTokens(tokens);
+    await secureTokens.save(tokens);
+    return tokens.accessToken;
+  } catch (error) {
+    const status = responseStatus(error);
+    if (status === 401 || status === 409) {
       await clearStoredSession();
       return null;
     }
-    throw e;
+    throw error;
   }
 }
 
 export const authService = {
   async loginWithApple(): Promise<void> {
-    const idToken = await appleAuth.signIn();
-    await loginWith('apple', idToken);
+    await loginWith('APPLE', await appleAuth.signIn());
   },
 
   async loginWithKakao(): Promise<void> {
-    const idToken = await kakaoAuth.signIn();
-    await loginWith('kakao', idToken);
+    await loginWith('KAKAO', await kakaoAuth.signIn());
   },
 
   async refreshAccessToken(): Promise<string | null> {
@@ -84,8 +88,26 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
+    const refreshToken = useAuthStore.getState().refreshToken;
+    try {
+      if (refreshToken) {
+        await authApi.logout({
+          refreshToken,
+          deviceId: await deviceId.get(),
+        });
+      }
+    } catch {
+      // A server or network failure must not trap the user in the local session.
+    } finally {
+      await clearStoredSession();
+      await signOutFromSocialProvider();
+    }
+  },
+
+  async deleteAccount(): Promise<void> {
+    await authApi.deleteMe();
     await clearStoredSession();
-    await kakaoAuth.signOut();
+    await signOutFromSocialProvider();
   },
 
   async restoreSession(): Promise<void> {
@@ -94,38 +116,6 @@ export const authService = {
       useAuthStore.getState().setStatus('unauthenticated');
       return;
     }
-
-    if (session.user) {
-      useAuthStore.getState().setSession({
-        user: session.user,
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-      });
-    } else {
-      useAuthStore.setState({
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        status: 'unknown',
-      });
-    }
-
-    try {
-      const user = await authApi.me();
-      const current = useAuthStore.getState();
-      const accessToken = current.accessToken ?? session.accessToken;
-      const refreshToken = current.refreshToken ?? session.refreshToken;
-      await secureTokens.save({ accessToken, refreshToken, user });
-      useAuthStore.getState().setSession({
-        user,
-        accessToken,
-        refreshToken,
-      });
-    } catch (e) {
-      if (isUnauthorized(e)) {
-        await clearStoredSession();
-      } else if (!session.user) {
-        useAuthStore.getState().setStatus('unauthenticated');
-      }
-    }
+    useAuthStore.getState().setSession(session);
   },
 };

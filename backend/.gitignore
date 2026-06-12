@@ -1,13 +1,23 @@
-.gradle/
+# Build output
 build/
-out/
-*.iml
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Secrets (real values live here on each environment)
+homes-secrets.properties
+
+# Logs
+logs/
+
+# IDE
 .idea/
+*.iml
+*.ipr
+*.iws
 .vscode/
-HELP.md
-*.log
-.env
-.env.local
-src/main/resources/jwt-private.pem
-src/main/resources/jwt-public.pem
-secrets.local.yml
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
