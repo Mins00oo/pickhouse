@@ -9,7 +9,6 @@ import { resolveApiBaseUrl } from '@/api/baseUrl';
 import { authService } from '@/auth/authService';
 import { queryClient } from '@/queries/queryClient';
 import { RootNavigator } from '@/navigation/RootNavigator';
-import { useSyncOrchestrator } from '@/sync/useSyncOrchestrator';
 import { colors } from '@/theme';
 import { applyGlobalFont, fontAssets } from '@/theme/fonts';
 
@@ -17,7 +16,6 @@ import { applyGlobalFont, fontAssets } from '@/theme/fonts';
 applyGlobalFont();
 
 function AppInner() {
-  useSyncOrchestrator();
   return (
     <>
       <RootNavigator />

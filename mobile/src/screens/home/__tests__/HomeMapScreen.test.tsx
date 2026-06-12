@@ -7,13 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { housesApi } from '@/api/houses.api';
-import { myPlacesRepo } from '@/db/myPlaces.repo';
+import { myPlacesApi } from '@/api/myPlaces.api';
 import { useAuthStore } from '@/stores/authStore';
 import type { House } from '@/types';
 import { HomeMapScreen } from '../HomeMapScreen';
 
 jest.mock('@/api/houses.api');
-jest.mock('@/db/myPlaces.repo');
+jest.mock('@/api/myPlaces.api');
 
 let queryClient: QueryClient | null = null;
 
@@ -112,7 +112,6 @@ beforeEach(() => {
     screenY: Math.round((37.63 - latitude) * 1500),
   }));
   useAuthStore.setState({
-    user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
     refreshToken: 'r',
     status: 'authenticated',
@@ -121,7 +120,7 @@ beforeEach(() => {
   (Location.getCurrentPositionAsync as jest.Mock).mockResolvedValue({
     coords: { latitude: 37.5563, longitude: 126.9236 },
   });
-  (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([]);
+  (myPlacesApi.list as jest.Mock).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -450,7 +449,7 @@ describe('HomeMapScreen', () => {
   });
 
   it('shows a primary commute time on house cards and hides the register banner once registered', async () => {
-    (myPlacesRepo.listActive as jest.Mock).mockResolvedValue([
+    (myPlacesApi.list as jest.Mock).mockResolvedValue([
       {
         id: 'w1',
         placeType: 'WORKPLACE',
