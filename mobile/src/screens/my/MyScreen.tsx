@@ -1,11 +1,15 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NavigationProp } from '@react-navigation/native';
+import { getAuthErrorMessage } from '@/auth/authErrors';
+import { authService } from '@/auth/authService';
 import { HouseStackParamList, MainTabParamList } from '@/navigation/types';
 import { useHouses } from '@/queries/houses.queries';
 import { useMyPlaces } from '@/queries/myPlaces.queries';
+import { useProfile } from '@/queries/profile.queries';
 import { PLACE_META } from '@/screens/houses/placeMeta';
 import { colors } from '@/theme';
 
@@ -14,6 +18,8 @@ type Props = BottomTabScreenProps<MainTabParamList, 'My'>;
 export function MyScreen({ navigation }: Props) {
   const { data: houses = [] } = useHouses();
   const { data: places = [] } = useMyPlaces();
+  const { data: profile } = useProfile();
+  const [accountAction, setAccountAction] = useState<'logout' | 'delete' | null>(null);
   const registered = places.length > 0;
 
   const rootNav = () =>
@@ -22,6 +28,46 @@ export function MyScreen({ navigation }: Props) {
   const openPlaces = () => rootNav().navigate('Places');
   const editPlace = (placeId: string) => rootNav().navigate('AddPlace', { placeId });
   const addPlace = () => rootNav().navigate('AddPlace', undefined);
+  const joinedAt = profile?.createdAt.slice(0, 10).replaceAll('-', '.');
+
+  const confirmLogout = () => {
+    Alert.alert('로그아웃할까요?', '', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '로그아웃',
+        onPress: () => {
+          setAccountAction('logout');
+          void authService.logout().catch((error) => {
+            setAccountAction(null);
+            Alert.alert('로그아웃 실패', getAuthErrorMessage(error));
+          });
+        },
+      },
+    ]);
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      '회원 탈퇴',
+      '탈퇴 후 30일 동안 계정을 복구할 수 있습니다. 정말 탈퇴할까요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '탈퇴하기',
+          style: 'destructive',
+          onPress: () => {
+            setAccountAction('delete');
+            void authService
+              .deleteAccount()
+              .catch((error) => {
+                setAccountAction(null);
+                Alert.alert('회원 탈퇴 실패', getAuthErrorMessage(error));
+              });
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -36,8 +82,10 @@ export function MyScreen({ navigation }: Props) {
             <Ionicons name="person" size={26} color={colors.primary} />
           </View>
           <View>
-            <Text style={styles.profileName}>내 집 찾기</Text>
-            <Text style={styles.profileSub}>기록한 집 {houses.length}곳</Text>
+            <Text style={styles.profileName}>{profile?.nickname || '내 집 찾기'}</Text>
+            <Text style={styles.profileSub}>
+              {joinedAt ? `${joinedAt} 가입 · ` : ''}기록한 집 {houses.length}곳
+            </Text>
           </View>
         </View>
 
@@ -112,19 +160,42 @@ export function MyScreen({ navigation }: Props) {
           <MenuRow icon="list-outline" label="내가 기록한 집" value={String(houses.length)} onPress={() => navigation.navigate('List')} />
           <MenuRow icon="grid-outline" label="비교 목록" onPress={() => navigation.navigate('Compare')} />
           <MenuRow icon="options-outline" label="설정" />
+          <MenuRow
+            icon="log-out-outline"
+            label={accountAction === 'logout' ? '로그아웃 중...' : '로그아웃'}
+            onPress={accountAction ? undefined : confirmLogout}
+          />
+          <MenuRow
+            icon="person-remove-outline"
+            label={accountAction === 'delete' ? '탈퇴 처리 중...' : '회원 탈퇴'}
+            destructive
+            onPress={accountAction ? undefined : confirmDeleteAccount}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function MenuRow({ icon, label, value, onPress }: { icon: string; label: string; value?: string; onPress?: () => void }) {
+function MenuRow({
+  icon,
+  label,
+  value,
+  destructive = false,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  value?: string;
+  destructive?: boolean;
+  onPress?: () => void;
+}) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.menuRow}>
+    <Pressable accessibilityRole="button" disabled={!onPress} onPress={onPress} style={styles.menuRow}>
       <View style={styles.menuIcon}>
-        <Ionicons name={icon as never} size={18} color={colors.ink70} />
+        <Ionicons name={icon as never} size={18} color={destructive ? colors.danger : colors.ink70} />
       </View>
-      <Text style={styles.menuLabel}>{label}</Text>
+      <Text style={[styles.menuLabel, destructive && styles.destructiveLabel]}>{label}</Text>
       {value ? <Text style={styles.menuValue}>{value}</Text> : null}
       <Ionicons name="chevron-forward" size={16} color={colors.muted} />
     </Pressable>
@@ -165,5 +236,6 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 15, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
   menuIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   menuLabel: { flex: 1, fontSize: 14.5, fontWeight: '600', color: colors.inkStrong, letterSpacing: -0.3 },
+  destructiveLabel: { color: colors.danger },
   menuValue: { fontSize: 12.5, fontWeight: '600', color: colors.muted },
 });

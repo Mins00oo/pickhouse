@@ -9,10 +9,10 @@ function stringProp(value: unknown, key: string): string | null {
 }
 
 function backendMessage(error: unknown): string | null {
+  if (error instanceof ApiError) return error.message;
   const response = asRecord(error)?.response;
   const data = asRecord(response)?.data;
-  const body = asRecord(data)?.error;
-  const message = asRecord(body)?.message;
+  const message = asRecord(data)?.message;
   return typeof message === 'string' && message.trim() ? message : null;
 }
 
@@ -44,3 +44,4 @@ export function getAuthErrorMessage(error: unknown): string {
 
   return String(error);
 }
+import { ApiError } from '@/api/client';

@@ -2,13 +2,17 @@ import * as Apple from 'expo-apple-authentication';
 import { appleAuth } from '../appleAuth';
 
 describe('appleAuth', () => {
-  it('signIn returns identityToken from Apple', async () => {
+  it('signIn returns identityToken and nullable displayName from Apple', async () => {
     (Apple.signInAsync as jest.Mock).mockResolvedValueOnce({
       identityToken: 'apple-id-token-xyz',
       user: 'apple_user',
+      fullName: { givenName: '길동', familyName: '홍' },
     });
-    const token = await appleAuth.signIn();
-    expect(token).toBe('apple-id-token-xyz');
+    const credential = await appleAuth.signIn();
+    expect(credential).toEqual({
+      idToken: 'apple-id-token-xyz',
+      displayName: '길동 홍',
+    });
   });
 
   it('throws when Apple returns null identityToken', async () => {

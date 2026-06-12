@@ -72,7 +72,6 @@ function mockHouses(nextHouses = houses) {
 beforeEach(() => {
   jest.clearAllMocks();
   useAuthStore.setState({
-    user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
     refreshToken: 'r',
     status: 'authenticated',

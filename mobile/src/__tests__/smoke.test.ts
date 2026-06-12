@@ -12,16 +12,18 @@ jest.mock('@/api/houses.api');
 
 beforeEach(() => {
   jest.clearAllMocks();
-  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, status: 'unknown' });
+  useAuthStore.setState({ accessToken: null, refreshToken: null, status: 'unknown' });
 });
 
 describe('mobile smoke', () => {
   it('apple login -> create house calls the backend API', async () => {
-    (appleAuth.signIn as jest.Mock).mockResolvedValueOnce('apple-token');
+    (appleAuth.signIn as jest.Mock).mockResolvedValueOnce({
+      idToken: 'apple-token',
+      displayName: null,
+    });
     (authApi.login as jest.Mock).mockResolvedValueOnce({
       accessToken: 'a',
       refreshToken: 'r',
-      user: { id: 'u1', authProviders: { apple: 'a' }, createdAt: '' },
     });
 
     await authService.loginWithApple();

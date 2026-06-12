@@ -1,12 +1,13 @@
 import { login, logout } from '@react-native-seoul/kakao-login';
+import { SocialLoginCredential } from '@/types';
 
 export const kakaoAuth = {
-  async signIn(): Promise<string> {
+  async signIn(): Promise<SocialLoginCredential> {
     const result = await login();
     if (!result.idToken) {
       throw new Error('Kakao login did not return an idToken');
     }
-    return result.idToken;
+    return { idToken: result.idToken, displayName: null };
   },
 
   async signOut(): Promise<void> {

@@ -15,9 +15,9 @@ describe('authErrors', () => {
       getAuthErrorMessage({
         response: {
           data: {
-            error: {
-              message: 'Kakao ID token invalid: audience mismatch',
-            },
+            code: 'INVALID_ID_TOKEN',
+            message: 'Kakao ID token invalid: audience mismatch',
+            data: null,
           },
         },
         message: 'Request failed with status code 401',
