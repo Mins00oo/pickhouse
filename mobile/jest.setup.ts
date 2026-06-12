@@ -20,10 +20,6 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(),
 }));
 
-jest.mock('expo-sqlite', () => ({
-  openDatabaseAsync: jest.fn(),
-}));
-
 jest.mock('expo-file-system', () => ({
   documentDirectory: 'file:///mock-doc/',
   cacheDirectory: 'file:///mock-cache/',
@@ -37,6 +33,9 @@ jest.mock('expo-file-system', () => ({
 jest.mock('expo-apple-authentication', () => ({
   isAvailableAsync: jest.fn().mockResolvedValue(true),
   signInAsync: jest.fn(),
+  formatFullName: jest.fn(({ givenName, familyName }) =>
+    [givenName, familyName].filter(Boolean).join(' '),
+  ),
   AppleAuthenticationScope: { FULL_NAME: 1, EMAIL: 2 },
   AppleAuthenticationButtonType: { SIGN_IN: 0, CONTINUE: 1, SIGN_UP: 2 },
   AppleAuthenticationButtonStyle: { WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2 },
@@ -46,10 +45,6 @@ jest.mock('expo-apple-authentication', () => ({
 jest.mock('@react-native-seoul/kakao-login', () => ({
   login: jest.fn(),
   logout: jest.fn(),
-}));
-
-jest.mock('expo-network', () => ({
-  getNetworkStateAsync: jest.fn().mockResolvedValue({ isConnected: true }),
 }));
 
 jest.mock('expo-location', () => ({

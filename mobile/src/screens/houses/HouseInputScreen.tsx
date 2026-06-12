@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { cameraHelper } from '@/photos/cameraHelper';
-import { photosRepo } from '@/db/photos.repo';
+import { photoCache } from '@/photos/photoCache';
+import { photoUploader } from '@/photos/photoUploader';
 import { useCreateHouse, useHouse, useUpdateHouse } from '@/queries/houses.queries';
 import { KakaoAddressPicker } from '@/integrations/kakaoAddress';
 import { geocodeAddress } from '@/integrations/kakaoGeocode';
@@ -123,7 +124,6 @@ export function HouseInputScreen({ navigation, route }: Props) {
   const { mutateAsync: createHouse, isPending } = useCreateHouse();
   const { mutateAsync: updateHouse, isPending: isUpdating } = useUpdateHouse();
   const { data: editingHouse } = useHouse(typeof houseId === 'string' ? houseId : undefined);
-  const workingHouseId = typeof houseId === 'string' ? houseId : undefined;
   const saving = isPending || isUpdating;
 
   const set = <K extends keyof WizardForm>(key: K, value: WizardForm[K]) =>
@@ -194,13 +194,13 @@ export function HouseInputScreen({ navigation, route }: Props) {
   }
 
   async function handleAddPhoto() {
-    const captured = await cameraHelper.takePhoto(workingHouseId);
+    const captured = await cameraHelper.takePhoto();
     if (captured) {
       setPhotos((p) => [
         ...p,
         {
           id: captured.id,
-          houseId: workingHouseId,
+          houseId: typeof houseId === 'string' ? houseId : undefined,
           localUri: captured.localUri,
           uploadStatus: 'pending',
           takenAt: new Date().toISOString(),
@@ -211,8 +211,30 @@ export function HouseInputScreen({ navigation, route }: Props) {
   }
 
   async function handleRemovePhoto(id: string) {
-    await photosRepo.softDelete(id);
+    const target = photos.find((photo) => photo.id === id);
+    if (target?.localUri) await photoCache.remove(target.localUri);
     setPhotos((arr) => arr.filter((p) => p.id !== id));
+  }
+
+  async function uploadPhotos(targetHouseId: string): Promise<number> {
+    const localPhotos = photos.filter(
+      (photo): photo is Photo & { localUri: string } => Boolean(photo.localUri),
+    );
+    const results = await Promise.allSettled(
+      localPhotos.map(async (photo) => {
+        try {
+          await photoUploader.upload({
+            localUri: photo.localUri,
+            mimeType: photo.mimeType,
+            photoId: photo.id,
+            houseId: targetHouseId,
+          });
+        } finally {
+          await photoCache.remove(photo.localUri);
+        }
+      }),
+    );
+    return results.filter((result) => result.status === 'rejected').length;
   }
 
   function buildDraft(): HouseDraft {
@@ -279,14 +301,20 @@ export function HouseInputScreen({ navigation, route }: Props) {
     }
     const draft = buildDraft();
     try {
+      let savedHouseId: string;
       if (typeof houseId === 'string') {
         await updateHouse({ id: houseId, patch: draft });
+        savedHouseId = houseId;
       } else {
         const created = await createHouse(draft);
-        const localPhotoIds = photos.map((p) => p.id);
-        if (localPhotoIds.length > 0) {
-          await photosRepo.attachToHouse(localPhotoIds, created.id);
-        }
+        savedHouseId = created.id;
+      }
+      const failedPhotoCount = await uploadPhotos(savedHouseId);
+      if (failedPhotoCount > 0) {
+        Alert.alert(
+          '사진 업로드 실패',
+          `${failedPhotoCount}장의 사진을 업로드하지 못했어요. 집 정보는 저장되었습니다.`,
+        );
       }
       navigation.goBack();
     } catch (e) {

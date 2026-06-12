@@ -6,11 +6,11 @@ import { useAuthStore } from '@/stores/authStore';
 import { housesApi } from '@/api/houses.api';
 import { geocodeAddress } from '@/integrations/kakaoGeocode';
 import { cameraHelper } from '@/photos/cameraHelper';
-import { photosRepo } from '@/db/photos.repo';
+import { photoUploader } from '@/photos/photoUploader';
 
 jest.mock('@/api/houses.api');
-jest.mock('@/db/photos.repo');
 jest.mock('@/photos/cameraHelper');
+jest.mock('@/photos/photoUploader');
 
 // 위저드는 Daum WebView(KakaoAddressPicker)를 직접 띄운다 → 선택 결과만 시뮬레이션.
 jest.mock('@/integrations/kakaoAddress', () => {
@@ -73,7 +73,6 @@ beforeEach(() => {
   );
   (housesApi.list as jest.Mock).mockResolvedValue([]);
   useAuthStore.setState({
-    user: { id: 'u1', authProviders: {}, createdAt: '' },
     accessToken: 'a',
     refreshToken: 'r',
     status: 'authenticated',
@@ -165,7 +164,7 @@ describe('HouseInputScreen (위저드)', () => {
     expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
   });
 
-  it('saves a new house without a client id and attaches local photos to the server id', async () => {
+  it('saves a new house and uploads local photos using the server id', async () => {
     (cameraHelper.takePhoto as jest.Mock).mockResolvedValueOnce({
       id: 'p-local',
       localUri: 'file:///tmp/p-local.jpg',
@@ -194,13 +193,17 @@ describe('HouseInputScreen (위저드)', () => {
     fireEvent.changeText(amountInputs[1], '50');
     fireEvent.press(tabs[3]);
     fireEvent.press(getByTestId('photo-add-button'));
-    await waitFor(() => expect(cameraHelper.takePhoto).toHaveBeenCalledWith(undefined));
+    await waitFor(() => expect(cameraHelper.takePhoto).toHaveBeenCalledWith());
     fireEvent.press(getByTestId('save-button'));
 
     await waitFor(() => expect(housesApi.create).toHaveBeenCalled());
     const [body] = (housesApi.create as jest.Mock).mock.calls[0]!;
     expect(body).not.toHaveProperty('id');
-    await waitFor(() => expect(photosRepo.attachToHouse).toHaveBeenCalledWith(['p-local'], 'server-h1'));
+    await waitFor(() =>
+      expect(photoUploader.upload).toHaveBeenCalledWith(
+        expect.objectContaining({ photoId: 'p-local', houseId: 'server-h1' }),
+      ),
+    );
     expect((nav as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
   });
 

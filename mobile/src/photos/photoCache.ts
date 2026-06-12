@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 
-const PHOTO_DIR = (FileSystem.documentDirectory ?? '') + 'photos/';
+const PHOTO_DIR = (FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '') + 'photos/';
 
 async function ensureDir(): Promise<void> {
   const info = await FileSystem.getInfoAsync(PHOTO_DIR);

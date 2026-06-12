@@ -79,7 +79,6 @@ export default ({ config }: ConfigContext) => ({
   plugins: [
     'expo-apple-authentication',
     'expo-secure-store',
-    'expo-sqlite',
     'expo-camera',
     'expo-file-system',
     [
